@@ -1,0 +1,40 @@
+\comment -*-tex-*-
+
+\comment -- Character aliases
+
+\bgroup
+\egroup
+
+\comment -- English error messages
+
+\setlang{en_US}
+\lcdef\errmsg\emtyConditionalBranch{Empty branch in conditional}
+\lcdef\errmsg\eotBeforeExpected{EOT occurred before expected input}
+\lcdef\errmsg\eotInCommandToken{EOT occurred while parsing command token}
+\lcdef\errmsg\eotInConditional{EOT occurred inside a conditional}
+\lcdef\errmsg\eotInGroup{EOT occurred inside a group}
+\lcdef\errmsg\eotInParamToken{EOT occurred while parsing parameter token}
+\lcdef\errmsg\errorsInAlias{Errors in alias expansion}
+\lcdef\errmsg\extraConditionalBranch{Extra branch after \backslash else in conditional}
+\lcdef\errmsg\hangingRpar{Hanging right parenthesis}
+\lcdef\errmsg\invalidCharToken{Not a character token}
+\lcdef\errmsg\invalidCommandInDef{Invalid command in definition}
+\lcdef\errmsg\invalidLocale{Invalid locale id}
+\lcdef\errmsg\invalidToken{Invalid token}
+\lcdef\errmsg\invalidInt{Invalid integer}
+\lcdef\errmsg\noContextInput{Input has no associated context}
+\lcdef\errmsg\noCondition{No condition found}
+\lcdef\errmsg\noLocale{Current locale unset}
+\lcdef\errmsg\noMatchingDef{No matching definition}
+\lcdef\errmsg\stackRotateBadScope#S{Invalid rotate scope: #S}
+\lcdef\errmsg\stackRotateBadValue#V{Invalid rotate value: #V}
+\lcdef\errmsg\stackUnderflow{Stack underflow}
+\lcdef\errmsg\undefined{Undefined command}
+\lcdef\errmsg\unfinishedDef{Unfinished definition}
+
+
+\comment -- Group delimiters as commands
+
+\def\bgroup{\noexpand{}
+\def\egroup{\noexpand}}
+

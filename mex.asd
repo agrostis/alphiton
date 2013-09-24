@@ -15,15 +15,17 @@
 (defmethod output-files ((op load-mex-prologue-op) component)
   (values nil nil))
 
+(defun slurp-file (mex-file)
+  (or (ignore-errors
+        (with-open-file (in mex-file)
+          (with-output-to-string (out)
+            (loop for c := (read-char in nil nil) while c
+                  do (write-char c out)))))
+      ""))
+
 (defmethod perform ((op load-mex-prologue-op) component)
   (let ((mex-file (car (input-files op component))))
-    (setq %prologue%
-          (or (ignore-errors
-                (with-open-file (in mex-file)
-                  (with-output-to-string (out)
-                    (loop for c := (read-char in nil nil) while c
-                       do (write-char c out)))))
-              ""))))
+    (setq %prologue% (slurp-file mex-file))))
 
 (defmethod operation-done-p ((op load-mex-prologue-op) component)
   nil)

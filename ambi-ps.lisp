@@ -731,7 +731,7 @@
    initialized with the corresponding INIT if the value is null).  Return
    the result of the last expression in BODY."
   `(let ((,var ,location))
-     (when (not ,var)
+     (when (null ,var)
        (setf ,var ,init ,location ,var))
      ,@(if more-bindings
            `((bind/init ,more-bindings ,@body))

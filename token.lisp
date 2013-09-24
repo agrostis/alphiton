@@ -98,7 +98,7 @@
   ;;                           | <escape> <cmd-name>
   ;;                <escape> ::= any character with base category escape;
   ;;              <cmd-name> ::= <noncon> | <con-seq>
-  ;;               <con-seq> ::= <con> | <con-seq> <con>
+  ;;               <con-seq> ::= <con-seq> <con> | <con>
   ;;                   <con> ::= any character with constituent flag on
   ;;                             and non-newline base category;
   ;;                <noncon> ::= any character which is not <con>;
@@ -111,6 +111,17 @@
   ;;  <param-escape-literal> ::= <param-escape> <param-escape>
   ;;             <bare-char> ::= any character with base category other than
   ;;                             escape, param, or newline.
+  ;; E. g., according to the standard category table, the following are
+  ;; <char-token>s:
+  ;;        a 9 @     <bare-char>s of categories letter, number, other;
+  ;;      TAB { }     <bare-char>s of categories whitespace, lbrace, rbrace;
+  ;;           ##     a <param-escape-literal>.
+  ;; Examples of other kinds of tokens:
+  ;;        CR+LF     a <newline-token> with <newline-con-seq>.
+  ;;           \*     a <cmd-token> with <noncon>;
+  ;;         \par     a <cmd-token> with <con-seq>;
+  ;;     #1 #x #+     <param-token>s over <char-token>s;
+  ;;        #\abc     a <param-token> over <cmd-token>.
 
   (ambi-ps ()
 
@@ -169,7 +180,7 @@
 
   (defun token** (type src)
     "Wrapper for TOKEN* to allow its use in ParenScript macros."
-    `(struct ,(token* type src)))
+    `(struct (lisp (token* ,type ,src))))
 
   (defun tokens* (&rest input)
     "Return a vector of tokens specified by arguments in INPUT which should
@@ -210,8 +221,11 @@
 
   (defun tokens** (&rest spec)
     "Wrapper for TOKENS* to allow its use in ParenScript macros."
-    `(vector
-      ,@(map 'list (lambda (tok) `(struct ,tok)) (apply #'tokens* spec))))
+    `(struct (lisp (tokens* ,@spec))))
+
+  (defmacro+ps tokens (&rest spec)
+    "Notation for token vector literals; see TOKENS*."
+    (apply #'tokens** spec))
 
 )
 

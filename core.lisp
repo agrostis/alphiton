@@ -78,6 +78,32 @@
                                 :replace-input dispatching arg)
                 tsrc))))))
 
+  (defbuiltin csname (match dispatching context)
+    "Consume tokens up to the nearest occurence of \endcsname,
+     expanding parameters.  Concatenate string representations of the
+     tokens (not including \endcsname) into one string, and expand to
+     a command token with that string for name."
+    (let ((tsrc (match-token-source match)))
+      (loop
+        for tok := (next-token/expand tsrc context)
+        if (or (par-break-p tok) (eot-p tok))
+          return (list
+                   (error-display* :add-to tok
+                                   :append-message "eotBeforeExpected"
+                                   :prepend-input dispatching content)
+                   tsrc)
+        else if (token-is tok :command "endcsname")
+          return (list
+                   (vector (make-command-token
+                             :start (token-start dispatching)
+                             :end (token-end tok)
+                             :context (token-context dispatching)
+                             :name (input-string (ensure-vector content))
+                             :escape-chr #\\))
+                   tsrc)
+        else
+          collect tok :into content)))
+
   (defun parse-definition (dispatching token-source context no-pattern-p)
     "Helper function for the builtins DEF, LCDEF and ALIAS.  Parse input
      from TOKEN-SOURCE for a macro / alias definition.  Return a list with

@@ -276,13 +276,13 @@
       (and (not (or (funcall *group-end-p* input-elt) (eot-p input-elt)))
            (if (group-p input-elt)
                (make-partial-match
-                 :delta-match-length 1
-                 :delta-token-count (group-token-count input-elt)
+                 :delta-match-length (group-token-count input-elt)
+                 :delta-token-count 0
                  :param-expansion (group-contents input-elt)
                  :pm-token-source token-source)
                (make-partial-match
                  :delta-match-length 1
-                 :delta-token-count 1
+                 :delta-token-count 0
                  :param-expansion (vector input-elt)
                  :pm-token-source token-source)))))
 

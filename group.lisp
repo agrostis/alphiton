@@ -99,10 +99,11 @@
     "Call NEXT-GROUP, set TOKEN-SOURCE-LOCATION to the token source that
      results when all group tokens have been consumed, and return the group
      object."
-    `(destructuring-bind (grp tsrc+)
-         (next-group ,token-source-location ,context ,expand ,ship)
-       (setf ,token-source-location tsrc+)
-       grp))
+    (with-ps-gensyms (grp tsrc+)
+      `(destructuring-bind (,grp ,tsrc+)
+           (next-group ,token-source-location ,context ,expand ,ship)
+         (setf ,token-source-location ,tsrc+)
+         ,grp)))
 
   (defun get-group-contents (token-source context expand ship)
     "Keep extracting groups and singleton tokens from TOKEN-SOURCE until we

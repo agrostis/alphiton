@@ -436,22 +436,30 @@
   (defmacro next-token/expand (token-source context)
     "Same as NEXT-TOKEN/SHIFT, but treat \noexpand specially, and expand
      parameters."
-    `(loop for tok0 := (next-token/shift ,token-source ,context)
-           for (tok tsrc+) := (expand-params-and-noexpands
-                                tok0 ,token-source ,context)
-           when tok
-             do (setf ,token-source tsrc+) 
-             and return tok))
+    (with-ps-gensyms (tok0 tok tsrc tsrc+)
+      `(loop with ,tsrc := ,token-source
+             for ,tok0 := (next-token/shift ,tsrc ,context)
+             for (,tok ,tsrc+) := (expand-params-and-noexpands
+                                    ,tok0 ,tsrc ,context)
+             if ,tok
+               do (setf ,token-source ,tsrc+) 
+               and return ,tok
+             else
+               do (setf ,tsrc ,tsrc+))))
 
   (defmacro next-group/expand (token-source context)
     "Same as NEXT-GROUP/SHIFT, but treat \noexpand specially, and expand
      parameters."
-    `(loop for grp0 := (next-group/shift ,token-source ,context)
-           for (grp tsrc+) := (expand-params-and-noexpands
-                                grp0 ,token-source ,context)
-           when grp
-             do (setf ,token-source tsrc+) 
-             and return grp))
+    (with-ps-gensyms (grp0 grp tsrc tsrc+)
+      `(loop with ,tsrc := ,token-source
+             for ,grp0 := (next-group/shift ,tsrc ,context)
+             for (,grp ,tsrc+) := (expand-params-and-noexpands
+                                    ,grp0 ,tsrc ,context)
+             if ,grp
+               do (setf ,token-source ,tsrc+) 
+               and return ,grp
+             else
+               do (setf ,tsrc ,tsrc+))))
 
 )
 
@@ -520,15 +528,16 @@
                                       ,@(and pred
                                              `((funcall ,pred ,var)))))))))
                    (ignore-errors
-                     (let* ((tokens (apply #'tokens** part)))
+                     (let* ((tokens (apply #'tokens** part))
+                            (pm (gensym "PM")))
                        (and tokens
-                            `(let ((pm (match-pattern-delimiter
-                                         (make-pattern-delimiter
-                                           :tokens ,tokens)
-                                         ,token-source ,context)))
-                               (and pm
+                            `(let ((,pm (match-pattern-delimiter
+                                          (make-pattern-delimiter
+                                            :tokens ,tokens)
+                                          ,token-source ,context)))
+                               (and ,pm
                                     (setf ,token-source
-                                            (pm-token-source pm)))))))
+                                            (pm-token-source ,pm)))))))
                    (error "Invalid MATCH-BIND pattern part: ~S" part)))
              pattern))
           ,seq

@@ -644,14 +644,15 @@
     "Extract and return next token from the source at TOKEN-SOURCE-LOCATION,
      at which then store a copy of the source with offset(s) shifted to just
      after that token."
-    `(loop for tok := (next-token ,token-source-location ,context
-                                  ,expand-aliases)
-           do (setf ,token-source-location
-                      (source-after-next-token ,token-source-location
-                                               ,context
-                                               tok))
-           if (not (and (eot-p tok) ,token-source-location))
-             return tok))
+    (with-ps-gensyms (tok)
+      `(loop for ,tok := (next-token ,token-source-location ,context
+                                     ,expand-aliases)
+             do (setf ,token-source-location
+                        (source-after-next-token ,token-source-location
+                                                 ,context
+                                                 ,tok))
+             if (not (and (eot-p ,tok) ,token-source-location))
+               return ,tok)))
 
   (defun next-char (token-source context)
     "Extract and return just one character from TOKEN-SOURCE."
@@ -697,11 +698,12 @@
     "Extract and return just one character from the source at
      TOKEN-SOURCE-LOCATION, at which then store a copy of the source with
      offset(s) shifted to just after that character."
-    `(loop for c := (next-char ,token-source-location ,context)
-           do (setf ,token-source-location
-                      (source-after-next-char ,token-source-location
-                                              ,context))
-           when (or c (not ,token-source-location)) return c))
+    (with-ps-gensyms (c)
+      `(loop for ,c := (next-char ,token-source-location ,context)
+             do (setf ,token-source-location
+                        (source-after-next-char ,token-source-location
+                                                ,context))
+             when (or ,c (not ,token-source-location)) return ,c)))
 
   (defmethod input-string ((tsrc token-source))
     (declare (special *root-context*))

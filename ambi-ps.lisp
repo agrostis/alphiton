@@ -201,6 +201,7 @@
   "Return an array containing either THING or its contents."
   (cond
     ((vectorp thing) thing)
+    ((stringp thing) ((@ thing split) ""))
     ((null thing) (vector))
     (t (vector thing))))
 

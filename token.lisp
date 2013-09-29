@@ -41,11 +41,30 @@
   (defmacro error-display* (&rest args)
     "Wrapper for using MAKE-ERROR-DISPLAY and ERROR-DISPLAY-ADD with error
      message name macros."
-    (flet ((arg-vector (args)
-             (if (null (cdr args))
-                 `(ensure-vector ,@args)
-                 `(vector-add
-                   ,@(mapcar (lambda (arg) `(ensure-vector ,arg)) args)))))
+    (labels ((arg-vector (args &optional (fn 'ensure-vector))
+               (if (null (cdr args))
+                   `(,fn ,@args)
+                   `(vector-add ,@(mapcar (lambda (arg) `(,fn ,arg))
+                                          args))))
+             (opt (args kwd kwd2 msg-p)
+               (let ((arg (getf args kwd))
+                     (arg2 (and (keywordp kwd2) (getf args kwd2))))
+                 (when (or arg arg2)
+                   (let* ((val0 (and arg
+                                     (if msg-p
+                                         (tokens** :command (car arg))
+                                         (arg-vector (reverse arg)))))
+                          (val2 (if arg2
+                                    (arg-vector
+                                      (reverse arg2)
+                                      (if msg-p
+                                          'error-display-message
+                                          'error-display-faulty-input))))
+                          (val (case (and val0 val2 kwd2)
+                                 ((:prepend) `(vector-add ,val2 ,val0))
+                                 ((:append) `(vector-add ,val0 ,val2))
+                                 (t (or val0 val2)))))
+                     (list kwd val))))))
       (if (keywordp (car args))
           (loop for arg :in args
                 with current-kwd := nil
@@ -55,20 +74,13 @@
                 else
                   do (push arg (getf args* current-kwd))
                 finally
-                 (flet ((opt (kwd msg-p)
-                           (let ((arg (getf args* kwd)))
-                             (when arg
-                               (let ((val (if msg-p
-                                              (tokens** :command (car arg))
-                                              (arg-vector (reverse arg)))))
-                                 (list kwd val))))))
                    (return
                      `(error-display-add ,(car (getf args* :add-to))
-                        ,@(opt :prepend-message t)
-                        ,@(opt :append-message t)
-                        ,@(opt :prepend-input nil)
-                        ,@(opt :append-input nil)
-                        ,@(opt :replace-input nil)))))
+                        ,@(opt args* :prepend-message :prepend t)
+                        ,@(opt args* :append-message :append t)
+                        ,@(opt args* :prepend-input :prepend nil)
+                        ,@(opt args* :append-input :append nil)
+                        ,@(opt args* :replace-input nil nil))))
           `(make-error-display
              :message (vector ,(tokens** :command (car args)))
              :faulty-input ,(arg-vector (cdr args))))))

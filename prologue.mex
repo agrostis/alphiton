@@ -1,6 +1,19 @@
 \comment -*-tex-*-
 
-\comment -- Character aliases
+\comment -- Unprintable character aliases
+
+\alias\newline{
+}
+\alias\blank{ }
+\alias\htab{	}
+\alias\nbsp{ }
+{\setcat\lbrace[\setcat\rbrace]\setcat\escape//
+ /setcat/other{/setcat/other}/setcat/other\/
+ /global/alias/backslash\/
+ /global/alias/leftbrace{/
+ /global/alias/rightbrace}/
+ /setcat/rbrace}/
+}
 
 \egroup
 

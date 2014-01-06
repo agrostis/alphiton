@@ -213,6 +213,48 @@
                 (error-expanded-match "noContextInput" dispatching
                                       tsrc+))))))
 
+  (defbuiltin edef (match dispatching context :token-source tsrc)
+    "Consume one command or active character token, followed by a (possibly
+     empty) sequence of singleton tokens, followed by a group.  Use the
+     first token to obtain a command key.  Completely expand the contents of
+     the group, except parameters from the sequence of singleton tokens.
+     Create a macro in the same manner as is done by DEF, but use the
+     expanded token sequence as the expansion of the macro."
+    (parser-state-bind (tsrc+ cmd-tok-or-error macro)
+        (parse-definition dispatching tsrc context nil)
+      (if (error-display-p cmd-tok-or-error)
+          (expanded-match cmd-tok-or-error tsrc+)
+          (let ((octx (ensure-opaque-context (token-context dispatching))))
+            (if octx
+                (let* ((expn
+                        (macro-expansion macro))
+                       (ectx
+                        (expansion-context tsrc))
+                       (expn-tsrc
+                        (expansion-to-token-source expn nil ectx))
+                       (params
+                        (loop for part :across (command-pattern macro)
+                              if (param-token-p part) collect part))
+                       (*unexpandable-params*
+                        (append params *unexpandable-params*)))
+                  (parser-state-bind (gtsrc expn* expn-errors)
+                      (get-group-tokens expn-tsrc context)
+                    (declare (ignore gtsrc))
+                    (if expn-errors
+                        (error-expanded-match
+                          :add-to expn*
+                          :append-message "errorsInAliasOrEdef"
+                          :prepend-input dispatching cmd-tok-or-error
+                          tsrc+)
+                        (bind/init ((table (command-table octx)
+                                           (make-table)))
+                          (setf (macro-expansion macro) expn*)
+                          (add-command (token-command-key cmd-tok-or-error)
+                                       macro table)
+                          (trivial-expanded-match tsrc+)))))
+                (error-expanded-match "noContextInput" dispatching
+                                      tsrc+))))))
+
   (defbuiltin alias (match dispatching context :token-source tsrc)
     "Consume one command or active character token, followed by a group or
      singleton token.  Use the first token to obtain a command key.

@@ -118,8 +118,8 @@
                         left-start left-end left-edge body-start
                         body-end right-edge right-start right-end))))
 
-    (defun cat-table-divide (ct pivot)
-      "Return a list of two category tables: 1) representing the part of the
+    (defun cat-table-divide (ct pivot cont)
+      "Call CONT on two category tables: 1) representing the part of the
        range of characters in the table CT strictly below character code
        PIVOT; and 2) representing the part of the range above and including
        PIVOT."
@@ -141,14 +141,15 @@
                ;; An exception surrounding PIVOT is further divided, and
                ;; each part appended to the exceptions on its own side.
                (if left-edge
-                   (destructuring-bind (el er)
-                       (cat-table-divide (aref exceptions left-edge) pivot)
-                     (setf
-                      (exceptions ct-left) (vector-add left (vector el))
-                      (exceptions ct-right) (vector-add (vector er) right)))
+                   (cat-table-divide (aref exceptions left-edge) pivot
+                     (lambda (el er)
+                       (setf (exceptions ct-left)
+                               (vector-add left (vector el))
+                             (exceptions ct-right)
+                               (vector-add (vector er) right))))
                    (setf (exceptions ct-left) left
                          (exceptions ct-right) right))))))
-        (list ct-left ct-right)))
+        (funcall cont ct-left ct-right)))
 
     (declaim (ftype function cat-table))
 

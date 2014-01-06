@@ -320,12 +320,12 @@
                ;  *ccat-letter* *ccat-number* *ccat-other*)
              (char-token-at source position context c cat))))))
 
-  (defun skip-empty-lines (source start)
-    "If the string SOURCE has an empty line at START, return the position
-     of the first character of the first non-empty line in the string
-     SOURCE after START.  Otherwise, return null.  (A line is terminated by
-     a newline-category character; it is empty if it contains only blank
-     and / or invalid characters.)"
+  (defun skip-empty-lines (source start cont)
+    "If the string SOURCE has an empty line at START, call CONT on the
+     position of the first character of the first non-empty line in the
+     string SOURCE after START.  Otherwise, call CONT with no arguments.  (A
+     line is terminated by a newline-category character; it is empty if it
+     contains only blank and / or invalid characters.)"
     (loop for i :from start :below (length source)
           for cat := (ccat-base (char-cat (char-at source i)))
           with last-newline := nil
@@ -333,9 +333,9 @@
                     (eq cat *ccat-invalid*))
           when (eq cat *ccat-newline*) do (setf last-newline i)
           finally (return (cond
-                            (last-newline (1+ last-newline))
-                            ((not cat) start)
-                            (t nil)))))
+                            (last-newline (funcall cont (1+ last-newline)))
+                            ((not cat) (funcall cont start))
+                            (t (funcall cont))))))
 
   (defun newline-token-at (source position context c cat)
     (declare (ignore context))
@@ -343,33 +343,67 @@
     (let* ((position+ (1+ position))
            (c+ (and (< position+ (length source))
                     (char-at source position+))))
-      (if (and c+
-               (ccat-constituent-p cat *ccat-newline*)
-               (ccat-constituent-p (char-cat c+) *ccat-newline*)
-               (not (eql c c+)))
-          (guarded-make-newline-token
-            :start position :end (1+ position+) :context context
-            :category cat :chr c :chr2 c+
-            ;; Empty lines generally denote paragraph breaks
-            :par-end (skip-empty-lines source (1+ position+)))
-          (guarded-make-newline-token
-            :start position :end position+ :context context
-            :category cat :chr c
-            ;; Idem
-            :par-end (skip-empty-lines source position+)))))
+      (flet ((token (tok-start tok-end chr &optional chr2)
+               (skip-empty-lines source tok-start
+                 (lambda (&optional past-empty-lines)
+                   (guarded-make-newline-token
+                     :start tok-start :end tok-end :context context
+                     :category cat :chr chr :chr2 chr2
+                     ;; Empty lines generally denote paragraph breaks
+                     :par-end past-empty-lines)))))
+        (if (and c+
+                 (ccat-constituent-p cat *ccat-newline*)
+                 (ccat-constituent-p (char-cat c+) *ccat-newline*)
+                 (not (eql c c+)))
+            (token position (1+ position+) c c+)
+            (token position position+ c)))))
 
-  (defun skip-constituent (source start)
-    "Return the position of the first character in the string SOURCE after
-     START which is not a constituent character.  A whitespace following a
-     sequence of constituents is consumed and results in a second value
-     being returned."
+  (defun skip-whitespace (source start cont)
+    "If the character in the string SOURCE at START is a whitespace, call
+     CONT on the position after it.  If it is an escape character followed
+     by a newline token, call CONT on the position of the first
+     non-whitespace after the newline.  Otherwise, call CONT on START."
+    (let ((cat (char-cat (char-at source start))))
+      (cond ((not (numberp cat))
+             (funcall cont start))
+            ((eq (ccat-base cat) *ccat-whitespace*)
+             (funcall cont (1+ start)))
+            ((eq (ccat-base cat) *ccat-escape*)
+             (let* ((start+ (1+ start))
+                    (cat+ (char-cat (char-at source start+))))
+               (if (and (numberp cat+)
+                        (eq (ccat-base cat+) *ccat-newline*))
+                   (let* ((start++ (1+ start+))
+                          (cat++ (char-cat (char-at source start++)))
+                          (startln (if (and (ccat-constituent-p cat+)
+                                            (numberp cat++)
+                                            (ccat-constituent-p
+                                              cat++ *ccat-newline*))
+                                       (1+ start++)
+                                       start++)))
+                     (loop for i :from startln :below (length source)
+                           for cat := (char-cat (char-at source i))
+                           while (eq (ccat-base cat) *ccat-whitespace*)
+                           finally (return (funcall cont i))))
+                   (funcall cont start))))
+            (t (funcall cont start)))))
+
+  (defun skip-constituent (source start cont)
+    "Call CONT on the position of the first character in the string SOURCE
+     after START which is not a constituent character.  If the sequence of
+     constituents is followed by a whitespace, CONT is passed a second
+     argument, the position of the first character after the whitespace."
     (loop for i :from start :below (length source)
           for cat := (char-cat (char-at source i))
           while (ccat-constituent-p cat (- *ccat-newline*))
-          finally (if (and (numberp cat)
-                           (eq (ccat-base cat) *ccat-whitespace*))
-                      (return (values i (1+ i)))
-                      (return i))))
+          finally (return
+                    (if (numberp cat)
+                        (skip-whitespace source i
+                          (lambda (past-whitespace)
+                            (if (= past-whitespace i)
+                                (funcall cont i)
+                                (funcall cont i past-whitespace))))
+                        (funcall cont i)))))
 
   (defun command-token-at (source position context c)
     "Parse SOURCE at POSITION for a newline token."    
@@ -377,14 +411,29 @@
       (if (< position+ (length source))
           (let* ((c+ (char-at source position+))
                  (cat+ (char-cat c+)))
-            (multiple-value-bind (name-end tok-end)
-                (if (ccat-constituent-p cat+ (- *ccat-newline*))
-                    (skip-constituent source (1+ position+))
-                    (1+ position+))
-              (guarded-make-command-token
-                :start position :end (or tok-end name-end)
-                :name (substring source position+ name-end)
-                :escape-chr c :context context)))
+            (if (eq (ccat-base cat+) *ccat-newline*)
+                (skip-whitespace source position
+                  (lambda (past-whitespace)
+                    (guarded-make-char-token
+                      :start position :end past-whitespace :context context
+                      :chr (char-at source (1- past-whitespace))
+                      :category *ccat-whitespace*)))
+                (let* ((name-end (1+ position+))
+                       (tok-end name-end))
+                  (if (ccat-constituent-p cat+ (- *ccat-newline*))
+                      (skip-constituent source name-end
+                        (lambda (past-consts &optional past-whitespace)
+                          (setf name-end past-consts
+                                tok-end (if (null past-whitespace)
+                                            past-consts
+                                            past-whitespace))))
+                      (skip-whitespace source name-end
+                         (lambda (past-whitespace)
+                           (setf tok-end past-whitespace))))
+                  (guarded-make-command-token
+                    :start position :end tok-end
+                    :name (substring source position+ name-end)
+                    :escape-chr c :context context))))
           (error-display* "eotInCommandToken"
             (make-command-token
               :start position :end position+ :context context

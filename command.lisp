@@ -487,7 +487,9 @@
 
 (defmacro+ps defbuiltin (name
                          (match-var dispatching-var context-var
-                          &optional (table '*command-table*))
+                          &key (patterns nil)
+                               (table '*command-table*)
+                               (token-source nil))
                          &body body)
   "Like DEFUN, but defines a command expansion handler bound to (COMMAND-KEY
    NAME) in TABLE.  Any handler must accept three arguments: a COMMAND-MATCH
@@ -496,16 +498,47 @@
    take the form of one token or error display, or of a vector of tokens
    and/or groups, or of the boolean true meaning a trivial (that is, empty)
    expansion."
-  (let ((docstring (if (stringp (car body)) (pop body))))
-    `(add-command ,(command-key name)
-                  (make-builtin
-                    :pattern (vector)
-                    :handler (lambda (,match-var ,dispatching-var
-                                      ,context-var)
-                               ,@(if docstring `(,docstring))
-                               (block ,name ,@body)))
-                  ,table t)))
+  (let ((docstring (if (stringp (car body)) (pop body)))
+        (handler-var (gensym "HNDLR"))
+        (patterns (if patterns
+                      (mapcar (lambda (pattern) `(tokens ,@pattern))
+                              patterns)
+                      (list (vector))))
+        (cmd (command-key name)))
+    `(let ((,handler-var
+            (lambda (,match-var ,dispatching-var ,context-var)
+              ,@(if docstring `(,docstring))
+              (block ,name
+                ,@(if token-source
+                      `((let ((,token-source
+                                (match-token-source ,match-var)))
+                          ,@body))
+                      body)))))
+       ,@(loop for pattern :in patterns
+               collect `(add-command ,cmd
+                          (make-builtin
+                            :pattern ,pattern
+                            :handler ,handler-var)
+                          ,table t)))))
 
+(defmacro+ps bind-match-params ((&rest bindings) match &body body)
+  "Evaluate BODY in an environment where variables from BINDINGS are bound
+   to expansions of eponymous parameters in MATCH."
+  (with-var-value (match)
+    `(let ,(loop for binding :in bindings
+                 for (param . default)
+                   := (or (ignore-errors
+                            (destructuring-bind (p d) binding (cons p d)))
+                          (cons binding nil))
+                 collect `(,param
+                           (let ((cmd (lookup-const-command
+                                        ,(command-key param)
+                                        (match-context ,match))))
+                             (if (macro-p cmd)
+                                 (macro-expansion cmd)
+                                 ,default))))
+       ,@body)))
+                         
 
 (defmacro+ps if-match-bind ((&rest pattern) token-source context
                             seq &optional alt)

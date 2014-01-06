@@ -183,13 +183,16 @@
         with bindings := (make-table)
         do (let ((pm (cond
                        ((param-token-p part)
-                        (let ((delim (aref* pattern (1+ i))))
+                        (let ((delim (aref* pattern (1+ i)))
+                              (restriction (and (restricted-param-token-p part)
+                                                (token-restriction part))))
                           (if (and delim (not (param-token-p delim)))
                               (progn
                                 (incf i)
                                 (match-param-delimited
-                                  delim token-source context))
-                              (match-param-single token-source context))))
+                                  delim token-source context restriction))
+                              (match-param-single
+                                token-source context restriction))))
                        ((pattern-delimiter-p part)
                         (match-pattern-delimiter part token-source context))
                        (t nil))))
@@ -232,7 +235,7 @@
                   :delta-token-count length
                   :pm-token-source token-source))))
 
-  (defun match-param-delimited (delimiter token-source context)
+  (defun match-param-delimited (delimiter token-source context restriction)
     "Match DELIMITER against the input in TOKEN-SOURCE which follows some
      (possibly empty) prefix, taken to match a parameter that precedes
      DELIMITER in a command pattern.  The prefix should be entirely
@@ -250,19 +253,22 @@
         and return delimiter-pm
       else if (or (funcall *group-end-p* input-elt)
                   (par-break-p input-elt)
-                  (eot-p input-elt))
+                  (eot-p input-elt)
+                  (and restriction
+                       (not (funcall restriction input-elt))))
         return nil
       else
         collect input-elt :into expn
         sum (if (group-p input-elt) (group-token-count input-elt) 1)
           :into match-length))
 
-  (defun match-param-single (token-source context)
+  (defun match-param-single (token-source context restriction)
     "Parse TOKEN-SOURCE for one group or singleton token which is taken to
      match a parameter in a command pattern.  Return a PARTIAL-MATCH
      object."
     (let ((input-elt (value1 (next-group token-source context))))
       (and (not (or (funcall *group-end-p* input-elt) (eot-p input-elt)))
+           (or (not restriction) (funcall restriction input-elt))
            (if (group-p input-elt)
                (make-partial-match
                  :delta-match-length (group-token-count input-elt)

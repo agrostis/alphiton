@@ -507,13 +507,13 @@
         (and (param-token-p a) (param-token-p b))
         (and (eot-token-p a) (eot-token-p b))))
 
-  (defgeneric input-string (input)
+  (defgeneric input-to-string (input)
     (:documentation "Return the string representation of an input element.")
     (:method (input)
       (if (vectorp input)
 	  (loop for part :across input
-	        for str := (input-string part)
-	                :then (concatenate 'string str (input-string part))
+	        for str := (input-to-string part)
+                  :then (concatenate 'string str (input-to-string part))
 	        finally (return str))
 	  ""))
     (:method ((token char-token))
@@ -527,8 +527,17 @@
           (interpolate "#(token-escape-chr token)#(token-name token)")
           (string (token-name token))))
     (:method ((token param-token))
-      (let ((arg-str (input-string (token-arg-token token))))
+      (let ((arg-str (input-to-string (token-arg-token token))))
         (interpolate "#(token-param-escape-chr token)#{arg-str}"))))
+
+(defun string-to-input (string context
+                        &optional (table (category-table context)))
+  (loop for i :from 0 :below (length string)
+        for c := (char-at string i)
+        collect (make-char-token :start i :end (1+ i) :context context
+                                 :chr c :category (char-cat c table))
+          :into tokens
+        finally (return (ensure-vector tokens))))
 
 )
 
@@ -550,7 +559,7 @@
 (defun token-short-format (token)
   "Format for printing tokens as parts of larger structures in the REPL, in
    traces, etc."
-  (let ((str (input-string token)))
+  (let ((str (input-to-string token)))
     (list "~A" (substitute-if #\Space (property-test "Cc") str))))
 
 (defmethod print-object ((token token) stream)
@@ -742,7 +751,7 @@
               (let ((tsrc+ (parent-source token-source)))
                 (and tsrc+ (next-char tsrc+ context)))
               (and (token-p tok)
-                   (let ((str (input-string tok)))
+                   (let ((str (input-to-string tok)))
                      (and (> (length str) 0)
                           (char-at str 0))))))))
 
@@ -760,7 +769,7 @@
           :parent-source (parent-source token-source)
           :expansion-context (expansion-context token-source))
         (let* ((tok (next-token token-source context nil))
-               (str (and (token-p tok) (input-string tok))))
+               (str (and (token-p tok) (input-to-string tok))))
           (if (and str (> (length str) 0))
               (make-token-source
                 :char-source str
@@ -780,11 +789,11 @@
                                                 ,context))
              when (or ,c (not ,token-source-location)) return ,c)))
 
-  (defmethod input-string ((tsrc token-source))
+  (defmethod input-to-string ((tsrc token-source))
     (declare (special *root-context*))
     (loop for tok := (next-token/shift tsrc *root-context*)
-	  for str := (input-string tok)
-	          :then (concatenate 'string str (input-string tok))
+	  for str := (input-to-string tok)
+	          :then (concatenate 'string str (input-to-string tok))
 	  finally (return str)))
 
   (defstruct (parser-state (:conc-name))

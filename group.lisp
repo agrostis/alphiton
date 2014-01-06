@@ -18,12 +18,12 @@
   (defmethod input-end ((grp group))
     (group-end grp))
 
-  (defmethod input-string ((ed error-display))
+  (defmethod input-to-string ((ed error-display))
     nil)
 
-  (defmethod input-string ((grp group))
+  (defmethod input-to-string ((grp group))
     (loop for sub :across (group-contents grp)
-          for sub-str := (input-string sub)
+          for sub-str := (input-to-string sub)
           while sub-str
           for str := sub-str :then (concatenate 'string str sub-str)
           finally (return str)))

@@ -4,29 +4,28 @@
 
 (ambi-ps ()
 
-  (defbuiltin relax (match dispatching context)
+  (defbuiltin relax (match dispatching context :token-source tsrc)
     "Expand to nothing, with no side effects."
-    (list t (match-token-source match)))
+    (trivial-expanded-match tsrc))
 
-  (defbuiltin comment (match dispatching context)
+  (defbuiltin comment (match dispatching context :token-source tsrc)
     "Consume everything to the end of the line, expand to nothing."
-    (loop with tsrc := (match-token-source match)
-          until (if-match-bind ((tok token)) tsrc context
+    (loop until (if-match-bind ((tok token)) tsrc context
                   (or (newline-token-p tok) (eot-p tok)))
-          finally (return (list t tsrc))))
+          finally (return (trivial-expanded-match tsrc))))
 
-  (defbuiltin expandafter (match dispatching context)
+  (defbuiltin expandafter (match dispatching context :token-source tsrc)
     "If the input after the first token (with parameters expanded) is a
      command, expand to the expansion of that command, preceded by the first
      token (the token and the following command are consumed).  Otherwise,
      expand to nothing, with no side effects."
-    (let ((tsrc (match-token-source match)))
-      (if-match-bind ((tok1 token) (tok2 token*)) tsrc context
-        (destructuring-bind (expd tsrc+) (mex-dispatch tok2 tsrc context)
-          (list t
-                (if expd
-                    (expansion-to-token-source (vector tok1) tsrc+ nil)
-                    (match-token-source match)))))))
+    (if-match-bind ((tok1 token) (tok2 token*)) tsrc context
+      (parser-state-bind (tsrc+ expd) (mex-dispatch tok2 tsrc context)
+        (trivial-expanded-match
+          (if expd
+              (let ((ectx (and tsrc+ (expansion-context tsrc+))))
+                (expansion-to-token-source (vector tok1) tsrc+ ectx))
+              tsrc)))))
 
   (defun replace-context (match dispatching get-context)
     "Helper function for the builtins GLOBAL and LOCAL.  Consume one token
@@ -40,9 +39,9 @@
           (if context*
               (let ((tok* (copy-structure tok)))
                 (setf (token-context tok*) context*)
-                (list (vector tok*) tsrc))
-              (list (error-display* "noContextInput" dispatching tok) tsrc)))
-        (list (error-display* "invalidToken" dispatching tok) tsrc))))
+                (expanded-match (vector tok*) tsrc))
+              (error-expanded-match "noContextInput" dispatching tok tsrc)))
+        (error-expanded-match "invalidToken" dispatching tok tsrc))))
 
   (defbuiltin global (match dispatching context)
     "Consume one token.  Expand to a token which is just like the consumed
@@ -61,57 +60,51 @@
     "Consume one token.  Expand to a token which is just like the consumed
      but whose native context is the local context (group or top-level)."
     (replace-context match dispatching (lambda () context)))
-                     
-  (defbuiltin setlang (match dispatching context)
+
+  (defbuiltin setlang (match dispatching context
+                        :patterns ((:param "lcid")) :token-source tsrc)
     "Consume one group (or singleton token), whose string representation
      should name a language.  Switch the locale of CONTEXT and all ancestor
      contexts to this language; expand to nothing."
-    (let ((tsrc (match-token-source match)))
-      (if-match-bind ((arg group)) tsrc context
-        (let ((locale-id (input-string arg)))
-          (if locale-id
-              (progn
-                (set-context-locale context locale-id)
-                (list t tsrc))
-              (list
-                (error-display* :add-to arg :append-message "invalidLocale"
-                                :replace-input dispatching arg)
-                tsrc))))))
+    (bind-match-params (lcid) match
+      (let ((locale-id (and lcid (input-to-string lcid))))
+        (if locale-id
+            (progn
+              (set-context-locale context locale-id)
+              (trivial-expanded-match tsrc))
+            (error-expanded-match "invalidLocale" dispatching lcid tsrc)))))
 
-  (defbuiltin csname (match dispatching context)
+  (defbuiltin csname (match dispatching context :token-source tsrc)
     "Consume tokens up to the nearest occurence of \endcsname,
      expanding parameters.  Concatenate string representations of the
      tokens (not including \endcsname) into one string, and expand to
      a command token with that string for name."
-    (let ((tsrc (match-token-source match)))
-      (loop
-        for tok := (next-token/expand tsrc context)
-        if (or (par-break-p tok) (eot-p tok))
-          return (list
-                   (error-display* :add-to tok
-                                   :append-message "eotBeforeExpected"
-                                   :prepend-input dispatching content)
-                   tsrc)
-        else if (token-is tok :command "endcsname")
-          return (list
-                   (vector (make-command-token
-                             :start (token-start dispatching)
-                             :end (token-end tok)
-                             :context (token-context dispatching)
-                             :name (input-string (ensure-vector content))
-                             :escape-chr #\\))
-                   tsrc)
-        else
-          collect tok :into content)))
+    (loop
+      for tok := (next-token/expand tsrc context)
+      if (or (par-break-p tok) (eot-p tok))
+        return (error-expanded-match :add-to tok
+                                     :append-message "eotBeforeExpected"
+                                     :prepend-input dispatching content
+                                     tsrc)
+      else if (token-is tok :command "endcsname")
+        return (expanded-match
+                 (make-command-token
+                   :start (token-start dispatching)
+                   :end (token-end tok)
+                   :context (token-context dispatching)
+                   :name (input-to-string (ensure-vector content))
+                   :escape-chr #\\)
+                 tsrc)
+      else
+        collect tok :into content))
 
   (defun parse-definition (dispatching token-source context no-pattern-p)
     "Helper function for the builtins DEF, LCDEF and ALIAS.  Parse input
-     from TOKEN-SOURCE for a macro / alias definition.  Return a list with
-     three values: the command or active token for the defined name (or an
-     error display, if the definition is syntactially invalid), a MACRO
-     object linking the pattern and the expansion (or just the expansion if
-     NO-PATTERN-P is true), and a token source pointing after the
-     definition."
+     from TOKEN-SOURCE for a macro / alias definition.  Return a parser
+     state with two values: the command or active token for the defined
+     name (or an error display, if the definition is syntactially invalid),
+     and a MACRO object linking the pattern and the expansion (or just the
+     expansion if NO-PATTERN-P is true)."
     (if-match-bind ((cmd-tok token #'dispatching-token-p))
         token-source context
       (loop named parse-def
@@ -151,10 +144,10 @@
                            (par-break-p d-tok)
                            (eot-p d-tok))
                  do (return-from parse-def
-                      (list (error-display*
-                              :add-to d-tok :append-message "unfinishedDef"
-                              :prepend-input (pattern-toks))
-                            nil token-source))
+                      (parser-state token-source
+                        (error-display*
+                          :add-to d-tok :append-message "unfinishedDef"
+                          :prepend-input (pattern-toks))))
                else
                  collect d-tok :into d-toks))
         when delimiter
@@ -162,17 +155,17 @@
         when param
           collect param :into pattern
         when expn
-          return (list cmd-tok
-                       (if no-pattern-p expn
-                           (make-macro :pattern (ensure-vector pattern)
-                                       :expansion expn))
-                       token-source))
-      (list (if (eot-p cmd-tok)
-                (error-display* "unfinishedDef" dispatching)
-                (error-display* "invalidCommandInDef" cmd-tok))
-            nil token-source)))
+          return (parser-state token-source
+                   cmd-tok
+                   (if no-pattern-p expn
+                       (make-macro :pattern (ensure-vector pattern)
+                                   :expansion expn))))
+      (parser-state token-source
+        (if (eot-p cmd-tok)
+            (error-display* "unfinishedDef" dispatching)
+            (error-display* "invalidCommandInDef" cmd-tok)))))
 
-  (defbuiltin def (match dispatching context)
+  (defbuiltin def (match dispatching context :token-source tsrc)
     "Consume one command or active character token, followed by a (possibly
      empty) sequence of singleton tokens, followed by a group.  Use the
      first token to obtain a command key.  Create a macro by separating the
@@ -182,28 +175,26 @@
      command table of the native context of the dispatching token (or its
      nearest opaque ancestor) under the given command key.  Expand to
      nothing."
-    (destructuring-bind (cmd-tok-or-error macro tsrc+)
-        (parse-definition dispatching (match-token-source match) context
-                          nil)
+    (parser-state-bind (tsrc+ cmd-tok-or-error macro)
+        (parse-definition dispatching tsrc context nil)
       (if (error-display-p cmd-tok-or-error)
-          (list cmd-tok-or-error tsrc+)
+          (expanded-match cmd-tok-or-error tsrc+)
           (let ((octx (ensure-opaque-context (token-context dispatching))))
             (if octx
                 (bind/init ((table (command-table octx) (make-table)))
                   (add-command (token-command-key cmd-tok-or-error)
                                macro table)
-                  (list t tsrc+))
-                (list (error-display* "noContextInput" dispatching)
-                      tsrc+))))))
+                  (trivial-expanded-match tsrc+))
+                (error-expanded-match "noContextInput" dispatching
+                                      tsrc+))))))
 
-  (defbuiltin lcdef (match dispatching context)
+  (defbuiltin lcdef (match dispatching context :token-source tsrc)
     "Same as DEF, except that the macro is stored in the localized command
      table for the current locale language (cf. SETLANG)."
-    (destructuring-bind (cmd-tok-or-error macro tsrc+)
-        (parse-definition dispatching (match-token-source match) context
-                          nil)
+    (parser-state-bind (tsrc+ cmd-tok-or-error macro)
+        (parse-definition dispatching tsrc context nil)
       (if (error-display-p cmd-tok-or-error)
-          (list cmd-tok-or-error tsrc+)
+          (expanded-match cmd-tok-or-error tsrc+)
           (let ((octx (ensure-opaque-context
                         (token-context dispatching))))
             (if octx
@@ -216,13 +207,13 @@
                           (add-command
                             (token-command-key cmd-tok-or-error)
                             macro command-table)
-                          (list t tsrc+))
-                        (list (error-display* "noLocale" dispatching)
-                              tsrc+))))
-                (list (error-display* "noContextInput" dispatching)
-                      tsrc+))))))
+                          (trivial-expanded-match tsrc+))
+                        (error-expanded-match "noLocale" dispatching
+                                              tsrc+))))
+                (error-expanded-match "noContextInput" dispatching
+                                      tsrc+))))))
 
-  (defbuiltin alias (match dispatching context)
+  (defbuiltin alias (match dispatching context :token-source tsrc)
     "Consume one command or active character token, followed by a group or
      singleton token.  Use the first token to obtain a command key.
      Completely expand the contents of the group (or just the singleton
@@ -230,10 +221,10 @@
      alias table of the native context of the dispatching token (or its
      nearest opaque ancestor) under the given command key.  Expand to
      nothing."
-    (destructuring-bind (cmd-tok-or-error expn tsrc+)
-        (parse-definition dispatching (match-token-source match) context t)
+    (parser-state-bind (tsrc+ cmd-tok-or-error expn)
+        (parse-definition dispatching tsrc context t)
       (if (error-display-p cmd-tok-or-error)
-          (list cmd-tok-or-error tsrc+)
+          (expanded-match cmd-tok-or-error tsrc+)
           (let ((octx (ensure-opaque-context (token-context dispatching)))
                 (expn-tsrc (expansion-to-token-source expn nil nil)))
             (if octx
@@ -241,25 +232,25 @@
                   (destructuring-bind (expn* expn-errors)
                       (get-group-tokens expn-tsrc context)
                     (if expn-errors
-                        (list (error-display*
-                                :add-to expn*
-                                :append-message "errorsInAlias"
-                                :prepend-input dispatching cmd-tok-or-error)
-                              tsrc+)
-                        (progn
+                        (error-expanded-match
+                          :add-to expn*
+                          :append-message "errorsInAliasOrEdef"
+                          :prepend-input dispatching cmd-tok-or-error
+                          tsrc+)
+                        (bind/init ((alias-table (alias-table octx)
+                                      (make-table)))
                           (remember (token-command-key cmd-tok-or-error)
                                     alias-table (ensure-vector expn*))
-                          (list t tsrc+)))))
-                (list (error-display* "noContextInput" dispatching)
-                      tsrc+))))))
+                          (trivial-expanded-match tsrc+)))))
+                (error-expanded-match "noContextInput" dispatching
+                                      tsrc+))))))
 
   (defun parse-ccat-spec (token-source context)
     "Helper function for the builtins SETCAT and CHR.  Parse input from
-     TOKEN-SOURCE for a character category specification.  Return a list
-     with three values: the category mask, a flag which is true iff the
-     input specifies a base category (as opposed to just toggling the active
-     and constituent flags), and a token source pointing after the
-     specification."
+     TOKEN-SOURCE for a character category specification.  Return a parser
+     state with two values: the category mask, and a flag which is true iff
+     the input specifies a base category (as opposed to just toggling the
+     active and constituent flags)."
     (let ((cat 0) (set-base-p nil))
       (macrolet ((set-cat (&rest args)
                    (or (ignore-errors
@@ -294,8 +285,9 @@
                     (set-cat constituent *ccat-constituent*)
                     (set-cat + constituent logior *ccat-constituent*)
                     (set-cat - constituent logandc2 *ccat-constituent*)))
-        (list (if (eq cat 0) *ccat-invalid* cat) set-base-p
-              token-source))))
+        (parser-state token-source
+          (if (eq cat 0) *ccat-invalid* cat)
+          set-base-p))))
 
   (defbuiltin setcat (match dispatching context)
     "Consume some tokens that constitute a character category specification,
@@ -303,7 +295,7 @@
      in the category table of the native context of the dispatching
      token (or its nearest opaque ancestor) by the specified category.
      Expand to nothing."
-    (destructuring-bind (cat set-base-p tsrc+)
+    (parser-state-bind (tsrc+ cat set-base-p)
         (parse-ccat-spec (match-token-source match) context)
       (if-match-bind ((c char)) tsrc+ context
         (let ((octx (ensure-opaque-context context)))
@@ -312,15 +304,15 @@
                 (unless set-base-p
                   (setf cat (logior (ccat-base (char-cat c ctab)) cat)))
                 (setf (category-table octx) (char-cat c ctab cat))
-                (list t tsrc+))
-              (list (error-display* "noContextInput" dispatching) tsrc+)))
-        (list (error-display* "eotBeforeExpected" dispatching) tsrc+))))
+                (trivial-expanded-match tsrc+))
+              (error-expanded-match "noContextInput" dispatching tsrc+)))
+        (error-expanded-match "eotBeforeExpected" dispatching tsrc+))))
 
   (defbuiltin chr (match dispatching context)
     "Consume some tokens that constitute a character category specification,
      and one untokenized character.  Expand to one character token with the
      given character value and specified category."
-    (destructuring-bind (cat set-base-p tsrc+)
+    (parser-state-bind (tsrc+ cat set-base-p)
         (parse-ccat-spec (match-token-source match) context)
       (if-match-bind ((c char)) tsrc+ context
         (let ((octx (ensure-opaque-context context)))
@@ -330,13 +322,12 @@
                     (pos (char-source-offset tsrc+)))
                 (unless set-base-p
                   (setf cat (logior (ccat-base (char-cat c ctab)) cat)))
-                (list (vector
-                        (guarded-make-char-token
-                          :start (1- pos) :end pos :context context
-                          :chr c :category cat))
-                      tsrc+))
-              (list (error-display* "noContextInput" dispatching) tsrc+)))
-        (list (error-display* "eotBeforeExpected" dispatching) tsrc+))))
+                (expanded-match (guarded-make-char-token
+                                  :start (1- pos) :end pos :context context
+                                  :chr c :category cat)
+                                tsrc+))
+              (error-expanded-match "noContextInput" dispatching tsrc+)))
+        (error-expanded-match "eotBeforeExpected" dispatching tsrc+))))
 
 )
 

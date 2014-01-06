@@ -389,6 +389,14 @@
          (parser-state token-source tok)))
       (t (parser-state token-source input))))
 
+  (defvar *unexpandable* '()
+    "List of command and active tokens that should not expand,
+     notwithstanding the general rule.")
+
+  (defvar *unexpandable-params* '()
+    "List of parameter tokens that should not expand, notwithstanding
+    the general rule.")
+
   (defun mex-dispatch (input token-source context)
     "If INPUT is expandable (i. e., is a command, active character, or
      parameter token), look up its command bindings in the appropriate
@@ -401,9 +409,14 @@
             (token-command-key input))
            (commands
             (cond
-              ((dispatching-token-p input)
+              ((and (dispatching-token-p input)
+                    (not (or (eq *unexpandable* t)
+                             (member input *unexpandable*
+                                     :test #'token-equal))))
                (lookup-commands cmd-key (token-context input)))
-              ((param-token-p input)
+              ((and (param-token-p input)
+                    (not (member input *unexpandable-params*
+                                 :test #'token-equal)))
                (let ((ectx (expansion-context token-source)))
                  (or (and ectx
                           (let ((cmd (lookup-const-command cmd-key ectx)))

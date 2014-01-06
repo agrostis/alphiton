@@ -451,7 +451,8 @@
      input in the vector TOKENS."
     (loop for tok :across tokens
           do (setf (token-context tok) context))
-    (let ((tsrc (expansion-to-token-source tokens parent-source nil)))
+    (let* ((ectx (and parent-source (expansion-context parent-source)))
+           (tsrc (expansion-to-token-source tokens parent-source ectx)))
       (simulate-command-with-input name tsrc context value-if-undefined)))
 
   (defmacro simulate-command (name input context

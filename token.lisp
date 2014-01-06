@@ -180,6 +180,9 @@
              (case type
                ((:char)
                 (make-char-token :chr src :category (char-cat src)))
+               ((:newline)
+                (make-newline-token :chr #\Newline :category *ccat-newline*
+                                    :par-end src))
                ((:command)
                 (make-dispatch-token src))
                ((:param)
@@ -224,6 +227,8 @@
                              (loop
                                for c :across src
                                do (push-token (token* :char c))))
+                            ((:newline)
+                             (push-token (token* :newline src)))
                             ((:command :param)
                              (push-token (token* type src)))
                             (t (error "Invalid TOKENS* type: ~S" type)))
@@ -406,7 +411,7 @@
                         (funcall cont i)))))
 
   (defun command-token-at (source position context c)
-    "Parse SOURCE at POSITION for a newline token."    
+    "Parse SOURCE at POSITION for a command token."
     (let ((position+ (1+ position)))
       (if (< position+ (length source))
           (let* ((c+ (char-at source position+))
@@ -664,7 +669,8 @@
              (setf (cached-tokens token-source) (make-stack)
                    (cached-token-offset token-source) 0))
             #| TBD: compare with the stored token's context's cat-table
-               instead. |#
+               instead.
+               TBD: clear unneeded tokens from cache. |#
             ((and (not (eq (cached-cat-table token-source) *category-table*))
                   (char-source token-source))
              (stack-clear (cached-tokens token-source)

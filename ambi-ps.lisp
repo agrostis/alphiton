@@ -547,7 +547,7 @@
 (defmacro struct (thing)
   "Drop through to Lisp's built-in means of representing structure
    literals."
-  `(the structure-object ,thing))
+  `(the (or structure-object vector) ,thing))
 
 (defpsmacro struct (thing)
   "Wrapper for MAKE-STRUCT-PS."

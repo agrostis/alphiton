@@ -84,8 +84,8 @@
     parent-context)
 
   (defstruct-guarded (opaque-context (:include context) (:guard context))
-    "A context whose category and command tables may be modified while
-     processing input.")
+    "A context whose category, command, and register tables may be
+     modified while processing input.")
 
   (defvar *no-transparent-contexts* nil
     "May be temporarily set to true to allow the modification of contexts

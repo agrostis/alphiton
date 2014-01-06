@@ -226,11 +226,12 @@
       (if (error-display-p cmd-tok-or-error)
           (expanded-match cmd-tok-or-error tsrc+)
           (let ((octx (ensure-opaque-context (token-context dispatching)))
-                (expn-tsrc (expansion-to-token-source expn nil nil)))
+                (ectx (and tsrc (expansion-context tsrc))))
             (if octx
-                (bind/init ((alias-table (alias-table octx) (make-table)))
-                  (destructuring-bind (expn* expn-errors)
+                (let ((expn-tsrc (expansion-to-token-source expn nil ectx)))
+                  (parser-state-bind (gtsrc expn* expn-errors)
                       (get-group-tokens expn-tsrc context)
+                    (declare (ignore gtsrc))
                     (if expn-errors
                         (error-expanded-match
                           :add-to expn*

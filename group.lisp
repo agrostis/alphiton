@@ -106,8 +106,8 @@
 
   (defun get-group-contents (token-source context expand ship)
     "Keep extracting groups and singleton tokens from TOKEN-SOURCE until we
-     get a terminal, i. e. an object satisfying *GROUP-END-P*.  If EXPAND is
-     true, aliases and commands are expanded.  If SHIP is not null, it
+     get a terminator, i. e. an object satisfying *GROUP-END-P*.  If EXPAND
+     is true, aliases and commands are expanded.  If SHIP is not null, it
      should be a function.  It is then passed on to NEXT-GROUP, and called
      on every extracted object which is not a group.  GET-GROUP-CONTENTS
      returns a parser state accumulating the group contents up to the

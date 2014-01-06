@@ -246,6 +246,38 @@
                 (error-expanded-match "noContextInput" dispatching
                                       tsrc+))))))
 
+  (defbuiltin error (match dispatching context
+                     :patterns ((:param "faulty" :param "message")))
+    "Consume two groups or singleton tokens.  Expand to an error display
+     with faulty input being the first group or token (subject to parameter
+     expansion), and with error message being the string representation of
+     the complete expansion of the second group or token."
+    (bind-match-params (faulty message) match
+      (flet ((errors-in-error (ed)
+               (error-expanded-match
+                 :add-to ed
+                 :append-message "errorsInError"
+                 :prepend-input dispatching faulty message
+                 (match-token-source match))))
+        (let ((faulty-tsrc (expansion-to-token-source faulty nil context))
+              (msg-tsrc (expansion-to-token-source message nil context)))
+          (parser-state-bind (gtsrc faulty-expn expn-errors)
+              (let ((*unexpandable* t))
+                (get-group-tokens faulty-tsrc context))
+            (declare (ignore gtsrc))
+            (if expn-errors
+                (errors-in-error faulty-expn)
+                (parser-state-bind (gtsrc msg-expn expn-errors)
+                    (get-group-tokens msg-tsrc context)
+                  (declare (ignore gtsrc))
+                  (if expn-errors
+                      (errors-in-error msg-expn)
+                      (expanded-match
+                        (make-error-display
+                          :faulty-input faulty-expn
+                          :message (input-to-string msg-expn))
+                        (match-token-source match))))))))))
+
   (defun parse-ccat-spec (token-source context)
     "Helper function for the builtins SETCAT and CHR.  Parse input from
      TOKEN-SOURCE for a character category specification.  Return a parser

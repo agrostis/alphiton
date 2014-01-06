@@ -27,6 +27,7 @@
 \lcdef\errmsg\eotInGroup{EOT occurred inside a group}
 \lcdef\errmsg\eotInParamToken{EOT occurred while parsing parameter token}
 \lcdef\errmsg\errorsInAlias{Errors in alias expansion}
+\lcdef\errmsg\errorsInError{Errors in \backslash error expansion}
 \lcdef\errmsg\extraConditionalBranch{Extra branch after \backslash else in conditional}
 \lcdef\errmsg\hangingRpar{Hanging right parenthesis}
 \lcdef\errmsg\invalidCharToken{Not a character token}

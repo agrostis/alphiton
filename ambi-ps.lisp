@@ -244,6 +244,18 @@
   "Return a new array containing the same elements but in reverse order."
   ((@ (sliced vector 0) reverse)))
 
+(defpsmacro member (thing seq &key test)
+  (if test
+      (with-var-value (seq)
+        (with-var-value (test)
+          (with-ps-gensyms (elt)
+            `(loop for ,elt :across ,seq
+                   if (funcall ,test ,thing ,elt)
+                     return ,elt))))
+      (with-ps-gensyms (i)
+        `(let ((,i ((@ ,seq index-of) ,thing)))
+           (and (>= ,i 0) (aref ,seq ,i))))))
+
 (defun vector-add (vec0 &rest vectors)
   "Return a new array of all the argument arrays concatenated together."
   (apply #'concatenate 'vector vec0 vectors))

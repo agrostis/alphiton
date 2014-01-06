@@ -47,8 +47,7 @@
      the group object: 1) after the left brace is consumed, and the group
      initialized; and 2) after the right brace is consumed, and the group
      finalized; it is also passed on to GET-GROUP-CONTENTS.  NEXT-GROUP
-     returns a list with two elements: the group extracted, and the token
-     source that results after all the tokens have been consumed."
+     returns a parser state accumulating the extracted group."
     (let ((tok0 (next-token/shift token-source context expand)))
       ;; A group begins with a non-active character of base category
       ;; lbrace (left brace) and ends with the balanced non-active
@@ -62,48 +61,48 @@
                       :parent-context context))
                (*group-end-p* #'rbrace-token-p))
            (when ship (funcall ship grp context))
-           (destructuring-bind (contents rbrace tsrc+)
+           (parser-state-bind (:accumulator contents :terminator term
+                               :error eot :token-source tsrc+)
                (get-group-contents token-source grp expand ship)
-             (list 
-               (if (eot-p contents)
-                   (error-display* :add-to contents
-                                   :append-message "eotInGroup")
-                   (progn
-                     (setf (group-end grp)
-                             (or (and rbrace (token-end rbrace))
-                                 (let ((last (aref* contents -1)))
-                                   (and last (input-end last)))
-                                 (token-end tok0))
-                           (group-contents grp)
-                             contents
-                           (group-rbrace grp)
-                             rbrace)
-                     (if ship
-                         (funcall ship grp context)
-                         (setf (group-token-count grp)
-                                 (+ (loop for sub :across contents
-                                          sum (if (group-p sub)
-                                                  (group-token-count sub)
-                                                  1))
-                                    (if rbrace 2 1))))
-                     grp))
-               tsrc+))))
+             (if eot
+                 (parser-error-state* tsrc+
+                   :add-to eot :append-message "eotInGroup")
+                 (progn
+                   (setf (group-end grp)
+                           (or (and term (token-end term))
+                               (let ((last (aref* contents -1)))
+                                 (and last (input-end last)))
+                               (token-end tok0))
+                         (group-contents grp)
+                           contents
+                         (group-rbrace grp)
+                           term)
+                   (if ship
+                       (funcall ship grp context)
+                       (setf (group-token-count grp)
+                             (+ (loop for sub :across contents
+                                      sum (if (group-p sub)
+                                              (group-token-count sub)
+                                              1))
+                                (if term 2 1))))
+                   (parser-accumulator-state tsrc+ group))))))
         ((and (rbrace-token-p tok0)
               (not (eq *group-end-p* #'rbrace-token-p))
               *verify-group-balance*)
-         (list (error-display* "hangingRbrace" tok0) token-source))
-        (t (list tok0 token-source)))))
+         (parser-error-state* token-source "hangingRbrace" tok0))
+        (t (parser-accumulator-state token-source tok0)))))
 
   (defmacro next-group/shift (token-source-location context
                               &optional expand ship)
     "Call NEXT-GROUP, set TOKEN-SOURCE-LOCATION to the token source that
      results when all group tokens have been consumed, and return the group
      object."
-    (with-ps-gensyms (grp tsrc+)
-      `(destructuring-bind (,grp ,tsrc+)
+    (with-ps-gensyms (grp ed tsrc+)
+      `(parser-state-bind (:accumulator ,grp :error ,ed
+                           :token-source ,tsrc+)
            (next-group ,token-source-location ,context ,expand ,ship)
          (setf ,token-source-location ,tsrc+)
-         ,grp)))
+         (or ,ed ,grp))))
 
   (defun get-group-contents (token-source context expand ship)
     "Keep extracting groups and singleton tokens from TOKEN-SOURCE until we
@@ -111,10 +110,8 @@
      true, aliases and commands are expanded.  If SHIP is not null, it
      should be a function.  It is then passed on to NEXT-GROUP, and called
      on every extracted object which is not a group.  GET-GROUP-CONTENTS
-     returns a list with three elements: a vector of extracted objects up to
-     but not including the terminal (except when SHIP is not null), the
-     terminal separately, and the token source which results after the
-     terminal has been consumed."
+     returns a parser state accumulating the group contents up to the
+     terminator."
     (loop for sub := (next-group/shift token-source context expand ship)
           for noexpand := (not expand)
           for expanded := nil
@@ -127,18 +124,20 @@
             do (setq sub (next-token/shift token-source context nil)
                      noexpand t)
           else if (funcall *group-end-p* sub)
-            return (list (and (not ship) (ensure-vector contents))
-                         sub token-source)
+            return (parser-accumulator-state token-source
+                     (and (not ship) (ensure-vector contents))
+                     sub)
           else if (eot-p sub)
-            return (list (if *verify-group-balance* sub
-                             (ensure-vector contents))
-                         nil token-source)
+            return (if *verify-group-balance*
+                       (parser-error-state token-source sub)
+                       (parser-accumulator-state token-source
+                         (and (not ship) (ensure-vector contents))))
           ;; Expand the expandable, ship the unexpandable (or add it
           ;; to group contents).
           unless noexpand
-            do (destructuring-bind (expd tsrc+)
-                   (mex-dispatch sub token-source context)
-                 (setf expanded expd token-source tsrc+))
+            do (let ((pstate (mex-dispatch sub token-source context)))
+                 (setf expanded (accumulator pstate)
+                       token-source (token-source-state pstate)))
           unless expanded
             if ship
               do (unless (group-p sub) (funcall ship sub context))
@@ -148,47 +147,62 @@
   (defun get-group-tokens (token-source context)
     "Run GET-GROUP-CONTENTS with command expansion to produce a flat
      sequence of tokens (possibly including group delimiter braces and error
-     displays).  Return a list with two values: the token sequence, and a
-     boolean indicating if there were errors while processing the input."
+     displays).  Return a parser state accumulating the tokens that make up
+     the group, with the error containing all the errors encountered during
+     the parsing, joined together."
     (let ((tokens (make-stack))
           (errors nil)
           (*group-end-p* #'eot-p)
           (*verify-group-balance* nil))
-      (get-group-contents token-source context t
-        (lambda (sub ctx)
-          (declare (ignore ctx))
-          (if (group-p sub)
-              (let ((brace (if (group-end sub)
-                               (group-rbrace sub)
-                               (group-lbrace sub))))
-                (when brace (stack-push brace tokens)))
-              (unless (eot-p sub) (stack-push sub tokens)))
-          (when (error-display-p sub) (setf errors t))))
-      (list tokens errors)))
+      (parser-state-bind (:token-source tsrc+)
+          (get-group-contents token-source context t
+            (lambda (sub ctx)
+              (declare (ignore ctx))
+              (if (group-p sub)
+                  (let ((brace (if (group-end sub)
+                                   (group-rbrace sub)
+                                   (group-lbrace sub))))
+                    (when brace (stack-push brace tokens)))
+                  (unless (eot-p sub) (stack-push sub tokens)))
+              (when (error-display-p sub)
+                (when (error-display-p errors)
+                  (setf errors
+                          (error-display*
+                            :add-to errors
+                            :append-input (tokens :chars "...")
+                            :append sub))))))
+        (make-parser-state :accumulator tokens :parser-error errors
+                           :token-source-state tsrc+))))
 
   (defun get-group-string (token-source context &optional braces)
     "Run GET-GROUP-CONTENTS with command expansion to produce a string
      representation of resulting tokens (including or excluding group
-     delimiter braces, according to the flag BRACES).  Return a list with
-     two values: the string, and a boolean indicating if there were errors
-     while processing the input."
+     delimiter braces, according to the flag BRACES).  Return a parser state
+     with the value being the string, and the error containing all the
+     errors encountered during the parsing, joined together."
     (let ((str "")
           (errors nil)
           (*group-end-p* #'eot-p)
           (*verify-group-balance* nil))
-      (get-group-contents token-source context t
-        (lambda (sub ctx)
-          (declare (ignore ctx))
-          (when (and braces (group-p sub))
-            (setf sub (if (group-end sub)
-                          (group-rbrace sub)
-                          (group-lbrace sub))))
-          (cond
-            ((and (token-p sub) (not (eot-token-p sub)))
-             (setf str (concatenate 'string str (input-string sub))))
-            ((error-display-p sub)
-             (setf errors t)))))
-      (list str errors)))
+      (parser-state-bind (:token-source tsrc+)
+          (get-group-contents token-source context t
+            (lambda (sub ctx)
+              (declare (ignore ctx))
+              (when (and braces (group-p sub))
+                (setf sub (if (group-end sub)
+                              (group-rbrace sub)
+                              (group-lbrace sub))))
+              (cond
+                ((and (token-p sub) (not (eot-token-p sub)))
+                 (setf str (concatenate 'string str (input-to-string sub))))
+                ((error-display-p sub)
+                 (setf errors
+                         (error-display*
+                           :add-to errors
+                           :append-input (tokens :chars "...")
+                           :append sub))))))
+        (make-parser-state :parser-value str :parser-error errors
+                           :token-source-state tsrc+))))
 
 #|
   (defun tokens-after (source position context end-token)

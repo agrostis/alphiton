@@ -787,6 +787,45 @@
 	          :then (concatenate 'string str (input-string tok))
 	  finally (return str)))
 
+  (defstruct (parser-state (:conc-name))
+    "A container for various kinds of parser states that may include some
+     accumulated token material, a terminator token, a non-token value, an
+     error display, and a token source positioned after the input consumed
+     to produce those details."
+    accumulator terminator parser-value parser-error token-source-state)
+
+  (defun parser-accumulator-state (token-source accumulator
+                                   &optional terminator)
+    "Return a parser state with accumulated material and an optional
+     terminator."
+    (make-parser-state :token-source-state token-source
+                       :accumulator accumulator
+                       :terminator terminator))
+
+  (defun parser-error-state (token-source error)
+    "Return a parser state with an error."
+    (make-parser-state :token-source-state token-source
+                       :error error))
+
+  (defmacro parser-error-state* (token-source &rest error-init)
+    "Return a parser state with an error, instantiated with ERROR-DISPLAY*
+     syntax."
+    `(parser-error-state ,token-source (error-display* ,@error-init)))
+
+  (defmacro parser-state-bind ((&key accumulator terminator value error
+                                     token-source)
+                               state
+                               &body body)
+    (with-var-value (state)
+      `(let (,@(and accumulator `((,accumulator (accumulator ,state))))
+             ,@(and terminator `((,terminator (terminator ,state))))
+             ,@(and value `((,value (parser-value ,state))))
+             ,@(and error `((,error (parser-error ,state))))
+             ,@(and token-source `((,token-source
+                                    (token-source-state ,state)))))
+             
+         ,@body)))
+
 )
 
 ;;; Local Variables: ***

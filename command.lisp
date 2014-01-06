@@ -215,17 +215,6 @@
               :match-length match-length
               :matched-token-count matched-token-count)))))
 
-  (defun expand-params-and-noexpands (input token-source context)
-    (cond
-      ((param-token-p input)
-       (destructuring-bind (expd tsrc+)
-           (mex-dispatch input token-source context)
-         (if expd (list nil tsrc+) (list input token-source))))
-      ((special-command-p input "noexpand")
-       (let ((tok (next-token/shift token-source context nil)))
-         (list tok token-source)))
-      (t (list input token-source))))
-
   (defun match-pattern-delimiter (delimiter token-source context)
     "Match DELIMITER against the input in TOKEN-SOURCE.  Return either a
      PARTIAL-MATCH object, or null, if the input does not match DELIMITER
@@ -254,7 +243,7 @@
       for delimiter-pm := (match-pattern-delimiter
                             delimiter token-source context)
       for input-elt := (and (not delimiter-pm)
-                            (next-group token-source context))
+                            (value1 (next-group token-source context)))
       if delimiter-pm
         do (incf (delta-match-length delimiter-pm) match-length)
            (setf (param-expansion delimiter-pm) (ensure-vector expn))
@@ -272,7 +261,7 @@
     "Parse TOKEN-SOURCE for one group or singleton token which is taken to
      match a parameter in a command pattern.  Return a PARTIAL-MATCH
      object."
-    (let ((input-elt (next-group token-source context)))
+    (let ((input-elt (value1 (next-group token-source context))))
       (and (not (or (funcall *group-end-p* input-elt) (eot-p input-elt)))
            (if (group-p input-elt)
                (make-partial-match
@@ -310,6 +299,17 @@
                      (setf best-match match)))))
           finally (return best-match)))
 
+  (defun parser-expansion-state (token-source expansion)
+    "Return a parser state after a command possibly has been matched and
+     expanded.  The accumulator contains the expansion, and the value is
+     true iff the parser state indeed resulted from an expansion (as opposed
+     to just peeking a non-expandable token)."
+    (if (eq expansion t)
+        (make-parser-state :token-source-state token-source :parser-value t)
+        (make-parser-state :token-source-state token-source
+                           :accumulator expansion
+                           :parser-value (and expansion t))))
+
   (defgeneric command-expansion (command match dispatching context)
     (:documentation "Get the sequence of tokens and/or groups that COMMAND
       expands to.  Additionally return the token source pointing after the
@@ -318,9 +318,10 @@
     (:method ((command builtin) match dispatching context)
       (funcall (builtin-handler command) match dispatching context))
     (:method ((command macro) match dispatching context)
-      (list (macro-expansion command) (match-token-source match)))
+      (parser-expansion-state (match-token-source match)
+                              (macro-expansion command)))
     (:method (command match dispatching context)
-      (list nil (match-token-source match))))
+      (parser-expansion-state (match-token-source match) nil)))
 
   (defun expansion-to-token-source (expansion parent-source context)
     "Convert a command expansion (vector of tokens and/or groups) into a
@@ -352,14 +353,12 @@
            (and (vectorp commands)
                 (match-command-best commands token-source context))))
       (if match
-          (destructuring-bind (&optional expn tsrc+)
+          (parser-state-bind (:accumulator expansion :token-source tsrc+)
               (command-expansion (matched-command match)
                                  match dispatching context)
-;           (format *trace-output* "~&******** Expanding ~S~%" dispatching)
-;           (format *trace-output* "~&**** Expanded => ~S; ~S~%" expn-cv sctx)
-            (if (eq expn t) tsrc+
-                (expansion-to-token-source
-                  expn tsrc+ (match-context match))))
+            (if expansion
+                (expansion-to-token-source expn tsrc+ (match-context match))
+                tsrc+))
           (let ((input (if (stringp dispatching)
                            (make-command-token
                              :escape-chr (char-at dispatching 0)
@@ -372,13 +371,32 @@
                   (error-display* "undefined" input))
               token-source nil)))))
 
+  (defun expand-params-and-noexpands (input token-source context)
+    "Expand any parameters at the beginning of INPUT, and remove protective
+     \noexpand.  If there was an expansion, return a parser state with value
+     NIL and the token source resulting from the expansion; otherwise,
+     return a parser state with the non-expandable token as value and the
+     token source after it."
+    (cond
+      ((param-token-p input)
+       (parser-state-bind (tsrc+ expd)
+           (mex-dispatch input token-source context)
+         (if expd
+             (parser-state tsrc+ nil)
+             (parser-state token-source input))))
+      ((special-command-p input "noexpand")
+       (let ((tok (next-token/shift token-source context nil)))
+         (parser-state token-source tok)))
+      (t (parser-state token-source input))))
+
   (defun mex-dispatch (input token-source context)
     "If INPUT is expandable (i. e., is a command, active character, or
      parameter token), look up its command bindings in the appropriate
      context(s), match the commands against the input in TOKEN-SOURCE, and
-     expand the best-matching command.  Return a list with two values: a
-     flag which is true iff INPUT is expandable, and the token source
-     resulting from consuming INPUT and expansion, where appropriate."
+     expand the best-matching command.  Return a parser state with a boolean
+     value which is true iff INPUT is expandable, and the token source
+     resulting from consuming INPUT and inserting expansion, where
+     appropriate."
     (let* ((cmd-key
             (token-command-key input))
            (commands
@@ -393,8 +411,9 @@
                      (lookup-commands cmd-key context))))
               (t t))))
       (if (eq commands t)
-          (list nil token-source)
-          (list t (expand-commands commands input token-source context)))))
+          (parser-state token-source nil)
+          (parser-state (expand-commands commands input token-source context)
+                        t))))
 
   (defun simulate-command-with-input (name token-source context
                                       value-if-undefined)
@@ -436,30 +455,30 @@
   (defmacro next-token/expand (token-source context)
     "Same as NEXT-TOKEN/SHIFT, but treat \noexpand specially, and expand
      parameters."
-    (with-ps-gensyms (tok0 tok tsrc tsrc+)
+    (with-ps-gensyms (tok0 pstate tsrc)
       `(loop with ,tsrc := ,token-source
              for ,tok0 := (next-token/shift ,tsrc ,context)
-             for (,tok ,tsrc+) := (expand-params-and-noexpands
-                                    ,tok0 ,tsrc ,context)
-             if ,tok
-               do (setf ,token-source ,tsrc+) 
-               and return ,tok
+             for ,pstate := (expand-params-and-noexpands
+                              ,tok0 ,tsrc ,context)
+             if (value1 ,pstate)
+               do (setf ,token-source (token-source-state ,pstate))
+               and return (value1 ,pstate)
              else
-               do (setf ,tsrc ,tsrc+))))
+               do (setf ,tsrc (token-source-state ,pstate)))))
 
   (defmacro next-group/expand (token-source context)
     "Same as NEXT-GROUP/SHIFT, but treat \noexpand specially, and expand
      parameters."
-    (with-ps-gensyms (grp0 grp tsrc tsrc+)
+    (with-ps-gensyms (grp0 pstate tsrc)
       `(loop with ,tsrc := ,token-source
              for ,grp0 := (next-group/shift ,tsrc ,context)
-             for (,grp ,tsrc+) := (expand-params-and-noexpands
-                                    ,grp0 ,tsrc ,context)
-             if ,grp
-               do (setf ,token-source ,tsrc+) 
-               and return ,grp
+             for ,pstate := (expand-params-and-noexpands
+                              ,grp0 ,tsrc ,context)
+             if (value1 ,pstate)
+               do (setf ,token-source (token-source-state ,pstate))
+               and return (value1 ,pstate)
              else
-               do (setf ,tsrc ,tsrc+))))
+               do (setf ,tsrc (token-source-state ,pstate)))))
 
 )
 
@@ -473,10 +492,10 @@
   "Like DEFUN, but defines a command expansion handler bound to (COMMAND-KEY
    NAME) in TABLE.  Any handler must accept three arguments: a COMMAND-MATCH
    object, the token which triggered the command, and the local context.  It
-   must return a list with two values: the expansion, as one token, or a
-   vector of tokens and/or groups (or the boolean true meaning no
-   expansion), and the token source pointing after the input that the
-   handler consumed."
+   must return a parser state with the value being the expansion, which may
+   take the form of one token or error display, or of a vector of tokens
+   and/or groups, or of the boolean true meaning a trivial (that is, empty)
+   expansion."
   (let ((docstring (if (stringp (car body)) (pop body))))
     `(add-command ,(command-key name)
                   (make-builtin
@@ -486,6 +505,7 @@
                                ,@(if docstring `(,docstring))
                                (block ,name ,@body)))
                   ,table t)))
+
 
 (defmacro+ps if-match-bind ((&rest pattern) token-source context
                             seq &optional alt)

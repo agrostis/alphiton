@@ -18,9 +18,10 @@
 (defun slurp-file (mex-file)
   (or (ignore-errors
         (with-open-file (in mex-file)
-          (with-output-to-string (out)
-            (loop for c := (read-char in nil nil) while c
-                  do (write-char c out)))))
+          (let ((str (make-array (file-length in)
+                       :element-type 'character :fill-pointer t)))
+            (setf (fill-pointer str) (read-sequence str in))
+            str)))
       ""))
 
 (defmethod perform ((op load-mex-prologue-op) component)

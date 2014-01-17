@@ -96,6 +96,18 @@
   (with-var-value (x)
     `(and (numberp ,x) (= (rem ,x 1) 0))))
 
+(defpsmacro truncate (x y)
+  "Divide X by Y, returning the integer quotient."
+  (with-var-value (x)
+    (with-var-value (y)
+      `(~~ (/ ,x ,y)))))
+
+(defpsmacro mod (x y)
+  "Return X modulo Y, with the same sign as Y."
+  (with-var-value (x)
+    (with-var-value (y)
+      `(rem (+ ,y (rem ,x ,y)) ,y))))
+
 
 ;; Strings and characters
 

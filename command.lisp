@@ -42,49 +42,67 @@
     (vector-equal a b #'pattern-part-equal))
 
   (defenum adjoin-force ()
-    *adjoin-weak* *adjoin-strong* *adjoin-supersede*)
+    *adjoin-weak* *adjoin-strong* *adjoin-supersede* *adjoin-append*)
 
   (defun adjoin-command (command homonyms force)
     "If no element of HOMONYMS (a vector of commands) has the same pattern
      as COMMAND, return a vector containing COMMAND and every element of
      HOMONYMS.  If an element of HOMONYMS has the same pattern as COMMAND,
      either discard COMMAND and return HOMONYMS verbatim, or return a copy
-     of HOMONYMS with that element replaced by COMMAND.  The last choice
-     depends on the types of the equipattern element and of COMMAND, and on
-     the value of FORCE."
+     of HOMONYMS with that element replaced by COMMAND, or change the
+     element's expansion by appending it to the expansion of COMMAND.
+     The choice depends on the types of the equipattern element and of
+     COMMAND, and on the value of FORCE:
+       * If FORCE is *ADJOIN-WEAK*, COMMAND is discarded.
+       * If FORCE is *ADJOIN-STRONG*, the equipattern element is replaced,
+         except if it is a builtin, and COMMAND a macro.
+       * If FORCE is *ADJOIN-SUPERSEDE*, the equipattern element is
+         replaced unconditionally.
+       * If FORCE is *ADJOIN-APPEND* and both COMMAND and the equipattern
+         element are macros, the expansion of COMMAND is appended.
+         Otherwise, *ADJOIN-APPEND* works like *ADJOIN-STRONG*."
     (loop for i :from 0 :below (length homonyms)
           for homonym := (aref homonyms i)
           if (pattern-equal (command-pattern command)
                             (command-pattern homonym))
-            return
+            do (when (and (eq force *adjoin-append*)
+                          (macro-p command) (macro-p homonym))
+                 (setf command
+                         (make-macro
+                           :pattern (command-pattern command)
+                           :expansion (vector-add
+                                        (macro-expansion homonym)
+                                        (macro-expansion command)))))
+            and return
               (if (or (eq force *adjoin-supersede*)
-                      (and (or (not (builtin-p homonym))
-                               (builtin-p command))
-                           (eq force *adjoin-strong*)))
+                      (and (or (eq force *adjoin-strong*)
+                               (eq force *adjoin-append*))
+                           (or (not (builtin-p homonym))
+                               (builtin-p command))))
                   (spliced homonyms i 1 command)
                   homonyms)
           finally (return (spliced homonyms 0 0 command))))
 
-  (defun add-command (name command &optional (table *command-table*) forcep)
+  (defun add-command (name command
+                      &optional (table *command-table*)
+                                (force *adjoin-weak*))
     "Add COMMAND to TABLE under the key NAME (a table may have multiple
      commands with a given name, distinguished by their patterns).  If TABLE
-     has another command with the same name and pattern, and FORCEP is
-     false, COMMAND is discarded; but if FORCEP is true, COMMAND replaces
-     the prior definition (except that a builtin is never replaced by a
-     non-builtin)."
+     has another command with the same name and pattern, the conflict is
+     resolved according to the types of the two commands and the value of
+     FORCE (see ADJOIN-COMMAND)."
     (let* ((homonyms (lookup name table #()))
-           (adjoined (adjoin-command
-                       command homonyms
-                       (if forcep *adjoin-strong* *adjoin-weak*))))
+           (adjoined (adjoin-command command homonyms force)))
       (unless (eq homonyms adjoined)
         (remember name table adjoined))))
 
   (defun add-const-macro (name expansion
-                          &optional (table *command-table*) forcep)
+                          &optional (table *command-table*)
+                                    (force *adjoin-weak*))
     "Add to TABLE, under the key NAME, a constant macro, i. e. a macro with
      an empty pattern and the given EXPANSION."
     (let ((cm (make-macro :pattern #() :expansion expansion)))
-      (add-command name cm table forcep)))
+      (add-command name cm table force)))
 
   (defun lookup-commands (name context)
     "Return a vector of commands recorded under the given NAME in the
@@ -204,7 +222,8 @@
                    (when (param-expansion pm)
                      (add-const-macro (token-command-key part)
                                       (param-expansion pm)
-                                      bindings)))
+                                      bindings
+                                      *adjoin-append*)))
                  (return nil)))
         finally
           (return

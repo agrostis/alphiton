@@ -135,8 +135,8 @@
           ;; Expand the expandable, ship the unexpandable (or add it
           ;; to group contents).
           unless noexpand
-            do (let ((pstate (mex-dispatch sub token-source context)))
-                 (setf expanded (accumulator pstate)
+            do (let ((pstate (mex-dispatch sub token-source context ship)))
+                 (setf expanded (parser-value pstate)
                        token-source (token-source-state pstate)))
           unless expanded
             if ship

@@ -164,11 +164,6 @@
 
     (defstruct-guarded (eot-token (:include token) (:guard token)))
 
-    (defstruct-guarded (restricted-param-token (:include param-token)
-                                               (:conc-name token-)
-                                               (:guard token))
-      restriction)
-
   )
 
   (defun token* (type src)
@@ -194,12 +189,6 @@
                 (make-param-token
                   :param-escape-chr #\#
                   :arg-token (make-dispatch-token src)))
-               ((:restricted-param)
-                (destructuring-bind (name restriction) src
-                  (make-restricted-param-token
-                    :param-escape-chr #\#
-                    :arg-token (make-dispatch-token name)
-                    :restriction restriction)))
                (t (error "Invalid TOKEN* type: ~S" type)))))
         (setf (token-start tok) 0 (token-end tok) 1)
         tok)))
@@ -240,7 +229,7 @@
                                do (push-token (token* :char c))))
                             ((:newline)
                              (push-token (token* :newline src)))
-                            ((:command :param :restricted-param)
+                            ((:command :param)
                              (push-token (token* type src)))
                             (t (error "Invalid TOKENS* type: ~S" type)))
                           (setf input input+)))))

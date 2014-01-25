@@ -146,7 +146,11 @@
 (defun ensure-string (thing)
   "Coerce THING (normally, a vector of characters) to string."
   (or (ignore-errors (coerce thing 'string))
-      (format nil "~A" thing)))
+      (if (arrayp thing)
+          (with-output-to-string (out)
+            (loop for sub :across thing
+                  do (format out "~A" (ensure-string sub))))
+          (format nil "~A" thing))))
 
 (defpsfun ensure-string (thing)
   "If THING is a vector (normally, of one-character strings), convert join

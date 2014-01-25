@@ -1,13 +1,8 @@
 ;;;; -*- lisp -*-
 
 (defpackage #:mex-system
-  (:use #:cl #:asdf)
-  (:export #:%prologue%))
+  (:use #:cl #:asdf))
 (in-package #:mex-system)
-
-
-(defvar %prologue% ""
-  "Code to run at start of Mex processing.")
 
 (defclass load-mex-prologue-op (operation)
   ())
@@ -25,8 +20,11 @@
       ""))
 
 (defmethod perform ((op load-mex-prologue-op) component)
-  (let ((mex-file (car (input-files op component))))
-    (setq %prologue% (slurp-file mex-file))))
+  (let ((mex-file (car (input-files op component)))
+        (prologue-var (ignore-errors
+                        (find-symbol "%PROLOGUE%" (find-package "MEX")))))
+    (when (and prologue-var (boundp prologue-var))
+      (set prologue-var (slurp-file mex-file)))))
 
 (defmethod operation-done-p ((op load-mex-prologue-op) component)
   nil)

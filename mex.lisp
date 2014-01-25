@@ -6,7 +6,7 @@
 
   (defvar *root-context* nil)
 
-  (defvar *prologue* #.mex-system:%prologue%
+  (defvar *prologue* #.%prologue%
     "Mex code to run at start of processing.")
 
   (defun init-root-context ()

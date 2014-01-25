@@ -54,11 +54,10 @@
       ;; character of base category rbrace (right brace).
       (cond
         ((lbrace-token-p tok0)
-         (let ((grp (guarded-make-group
-                      :lbrace tok0 
-                      :start (token-start tok0)
+         (let ((grp (spawn-context context (guarded group)
                       :category-table (category-table (token-context tok0))
-                      :parent-context context))
+                      :lbrace tok0
+                      :start (token-start tok0)))
                (*group-end-p* #'rbrace-token-p))
            (when ship (funcall ship grp context))
            (parser-state-bind (:accumulator contents :terminator term

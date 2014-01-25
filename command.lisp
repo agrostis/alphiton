@@ -251,10 +251,10 @@
                         :parser-value command
                         :dispatching-token dispatching
                         :token-source-state token-source
-                        :match-context (guarded-make-context
+                        :match-context (spawn-context tsrc0-ctx
+                                           (guarded context)
                                          :category-table ctab
-                                         :command-table bindings
-                                         :parent-context tsrc0-ctx)
+                                         :command-table bindings)
                         :match-length match-length
                         :matched-token-count matched-token-count))))))
 
@@ -513,9 +513,7 @@
            (commands (lookup-commands key context)))
       (if (and (not commands) (not (eq value-if-undefined t)))
           value-if-undefined
-          (let* ((context* (make-opaque-context
-                             :category-table (category-table context)
-                             :parent-context context))
+          (let* ((context* (spawn-context context (opaque-context)))
                  (expn (mex-expand commands key token-source context* nil)))
             (setf (parent-source expn) nil)
             expn))))

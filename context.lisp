@@ -99,6 +99,33 @@
               until (or (not ctx) (opaque-context-p ctx))
               finally (return ctx))))
 
+  (defmacro spawn-context (&rest args)
+    (let (context constructor slot-init-args)
+      (destructure/or args
+        ((ctx (guarded type) &rest kwargs)
+         (when (eq guarded 'guarded)
+           (setf context ctx slot-init-args kwargs
+                 constructor (find-symbol
+                               (format nil "GUARDED-MAKE-~A" type)))))
+        ((ctx (type) &rest kwargs)
+         (setf context ctx slot-init-args kwargs
+               constructor (find-symbol (format nil "MAKE-~A" type))))
+        ((ctx &rest kwargs)
+         (when (or (null kwargs) (keywordp (car kwargs)))
+           (setf context ctx slot-init-args kwargs
+                 constructor 'make-context)))
+        (t (error "Invalid use of macro: (SPAWN-CONTEXT~{ ~A~})"
+                  args)))
+      (with-var-value (context)
+        `(,constructor
+          ,@(loop for (kw val) :on slot-init-args :by #'cddr
+                  with slot-init
+                    = (list :category-table `(category-table ,context)
+                            :dom-stack `(dom-stack ,context)
+                            :parent-context context)
+                  do (setf (getf slot-init kw) val)
+                  finally (return slot-init))))))
+
   (defun set-context-locale (context locale-id)
     "Set the current locale (localized command table) in CONTEXT and in
      every ancestor of CONTEXT to the locale whose id is LOCALE-ID.

@@ -360,38 +360,36 @@
   "Push THING onto STACK."
   ((@ stack push) thing))
 
-(defun stack-pop (stack &optional error-fn)
+(defun stack-pop (stack &optional underflow-fn)
   "Remove the top element of STACK, returning it.  If STACK is empty,
-   return the result of calling ERROR-FN with one argument (an error
-   message)."
+   return the result of calling UNDERFLOW-FN."
   (if (plusp (fill-pointer stack))
       (vector-pop stack)
-      (and error-fn (funcall error-fn "stackUnderflow"))))
+      (and underflow-fn (funcall underflow-fn))))
 
-(defpsfun stack-pop (stack &optional error-fn)
+(defpsfun stack-pop (stack &optional underflow-fn)
   "Remove the top element of STACK, returning it.  If STACK is empty,
-   return the result of calling ERROR-FN with one argument (an error
-   message)."
+   return the result of calling UNDERFLOW-FN."
   (if (> (length stack) 0)
       ((@ stack pop))
-      (and error-fn (funcall error-fn "stackUnderflow"))))
+      (and underflow-fn (funcall underflow-fn))))
 
-(defun stack-peek (stack &optional (depth 1) error-fn)
-  "Return the element of STACK which is at the given DEPTH (the top
-   element is at depth 1).  If STACK has less than DEPTH elements, return
-   the result of calling ERROR-FN with one argument (an error message)."
+(defun stack-peek (stack &optional (depth 1) underflow-fn)
+  "Return the element of STACK which is at the given DEPTH (the top element
+   is at depth 1).  If STACK has less than DEPTH elements, return the result
+   of calling UNDERFLOW-FN."
   (let ((offset (- (fill-pointer stack) depth)))
     (if (minusp offset)
-        (and error-fn (funcall error-fn "stackUnderflow"))
+        (and underflow-fn (funcall underflow-fn))
         (aref stack offset))))
 
-(defpsfun stack-peek (stack &optional (depth 1) error-fn)
-  "Return the element of STACK which is at the given DEPTH (the top
-   element is at depth 1).  If STACK has less than DEPTH elements, return
-   the result of calling ERROR-FN with one argument (an error message)."
+(defpsfun stack-peek (stack &optional (depth 1) underflow-fn)
+  "Return the element of STACK which is at the given DEPTH (the top element
+   is at depth 1).  If STACK has less than DEPTH elements, return the result
+   of calling UNDERFLOW-FN."
   (let ((offset (- (length stack) depth)))
     (if (< offset 0)
-        (and error-fn (funcall error-fn "stackUnderflow"))
+        (and underflow-fn (funcall underflow-fn))
         (aref stack offset))))
 
 (defun stack-clear (stack &optional scope)
@@ -407,18 +405,15 @@
       ((@ stack splice) (max 0 (- (length stack) scope)) scope)
       ((@ stack splice) 0 (length stack))))
 
-(defun+ps stack-rotate (stack scope value &optional error-fn)
-  "Rotate by VALUE positions the top SCOPE elements of STACK.  If STACK
-   has less than SCOPE elements, return the result of calling ERROR-FN
-   with one argument (an error message)."
+(defun+ps stack-rotate (stack scope value &optional underflow-fn)
+  "Rotate by VALUE positions the top SCOPE elements of STACK.  If STACK has
+   less than SCOPE elements, return the result of calling UNDERFLOW-FN."
   (let ((depth (stack-depth stack)))
     (cond
-      ((not (and (integerp scope) (<= 0 scope)))
-       (and error-fn (funcall error-fn "stackRotateBadScope" scope)))
-      ((not (integerp value))
-       (and error-fn (funcall error-fn "stackRotateBadValue" value)))
+      ((<= scope 0)
+       nil)
       ((> scope depth)
-       (and error-fn (funcall error-fn "stackUnderflow")))
+       (and underflow-fn (funcall underflow-fn)))
       (t (dotimes (i scope)
            (stack-push
              (aref stack (+ (mod (- i value) scope) (- depth scope)))

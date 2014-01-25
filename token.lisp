@@ -279,6 +279,10 @@
     (:method ((tok eot-token)) t)
     (:method ((ed error-display)) (eot-p (faulty-input-last ed))))
 
+  (defun non-eot-p (thing)
+    "Return true iff THING does not signify an end of text."
+    (not (eot-p thing)))
+
   (defgeneric par-break-p (thing)
     (:documentation "Return true iff THING signifies a paragraph break.")
     (:method (thing) nil)
@@ -543,6 +547,18 @@
                                  :chr c :category (char-cat c table))
           :into tokens
         finally (return (ensure-vector tokens))))
+
+  (defgeneric data-to-input (thing context)
+    (:documentation "Convert arbitrary datum to input elements (tokens,
+     groups, error displays, and/or sequences thereof).")
+    (:method (thing context)
+      (string-to-input (ensure-string thing) context))
+    (:method ((token token) context)
+      (declare (ignore context))
+      token)
+    (:method ((error-display error-display) context)
+      (declare (ignore context))
+      error-display))
 
 )
 

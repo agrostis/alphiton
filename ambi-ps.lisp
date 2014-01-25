@@ -762,6 +762,18 @@
            `((bind/init ,more-bindings ,@body))
            body)))
 
+(defmacro destructure/or (datum &rest clauses)
+  "For use in macro definitions.  Try to destructure DATUM according
+   to patterns that are CARs of CLAUSES, and evaluate respective
+   clause bodies until we get a non-null value."
+  `(or ,@(loop for (pattern . body) :in clauses
+               if (eq pattern t)
+                 collect `(progn ,@body)
+               else
+                 collect `(ignore-errors
+                            (destructuring-bind ,pattern ,datum
+                              ,@body)))))
+
 ;;; Local Variables: ***
 ;;; mode:lisp ***
 ;;; local-font-lock-keywords:(("(\\(def\\(?:ps\\(?:macro\\|fun\\)\\|\\(?:un\\|macro\\)\\+ps\\)\\)[ \t\n]+\\([^()]*?\\)[ \t\n]" (1 font-lock-keyword-face)) ("(\\(ambi-ps\\)\\_>" (1 font-lock-preprocessor-face))) ***

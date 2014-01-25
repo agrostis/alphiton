@@ -44,6 +44,17 @@
         (and (vectorp a) (vectorp b)
              (vector-equal a b #'pattern-part-equal))))
 
+  (defun pattern-tokens (pattern)
+    "Return the tokens which make up PATTERN as a flat sequence."
+    (loop with toks := (stack)
+          for part :in pattern
+          if (token-p part)
+            do (stack-push part toks)
+          else if (pattern-delimiter-p part)
+            do (loop for tok :across (delimiter-tokens part)
+                     do (stack-push tok toks))
+          finally (return (ensure-vector toks))))
+
   (defenum adjoin-force ()
     *adjoin-weak* *adjoin-strong* *adjoin-supersede* *adjoin-append*)
 
@@ -486,6 +497,13 @@
             (make-parser-state
               :token-source-state expn-tsrc :parser-value t)))))
 
+  (defun get-full-expansion (input token-source context)
+    (let* ((ectx (and token-source (expansion-context token-source)))
+           (tsrc+ (expansion-to-token-source
+                    (if (group-p input) (group-contents input) input)
+                    nil ectx)))
+      (get-group-tokens tsrc+ context)))
+ 
   (defun simulate-command-with-input (name token-source context
                                       value-if-undefined)
     "Look up commands bound to NAME in CONTEXT, match them against input
@@ -666,6 +684,9 @@
            (make-builtin :pattern ,pattern-var :handler ,handler-var)
            ,table *adjoin-strong*)))))
 
+(defun builtin-makunbound (name &optional (table *command-table*))
+  (let ((cmd (command-key name)))
+    (remember cmd table #())))
 
 (defun builtin-curry-handler (builtin &rest args)
   (let ((handler (builtin-handler builtin)))

@@ -222,6 +222,10 @@
                            #'group-equal))
         (token-equal a b)))
 
+  (defmethod data-to-input ((group group) context)
+    (declare (ignore context))
+    group)
+
 )
 
 (defmethod print-object ((group group) stream)

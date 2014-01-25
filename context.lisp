@@ -119,13 +119,17 @@
      the localized command table shall be a copy of that locale's command
      table; otherwise, it shall be an empty table."
     (let* ((locales (locale-table context))
-           (extant-command-table (lookup locale-id locales))
            (proto-command-table (and proto (lookup proto locales))))
-      (and (not extant-command-table)
-           (remember locale-id locales
-                     (if proto-command-table
-                         (copy-table proto-command-table)
-                         (make-table))))))
+      (unless (lookup locale-id locales)
+        (let ((locale-command-table
+               (if proto
+                   (and proto-command-table
+                        (remember locale-id locales
+                                  (copy-table proto-command-table)))
+                   (remember locale-id locales (make-table)))))
+          (when locale-command-table
+            (remember "" locale-command-table locale-id)
+            (remember "" locales locale-command-table))))))
 
   (defvar *default-locale* "en_US"
     "The lingua franca.")

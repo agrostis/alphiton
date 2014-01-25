@@ -678,8 +678,7 @@
      category and alias definitions in CONTEXT (however, aliases are not
      taken into account if the flag EXPAND-ALIASES is false)."
     (if token-source
-        (let ((*category-table*
-               (category-table (ensure-opaque-context context))))
+        (let ((*category-table* (category-table context)))
           (cond
             ((not (cached-tokens token-source))
              (setf (cached-tokens token-source) (make-stack)

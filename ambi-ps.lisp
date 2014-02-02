@@ -38,6 +38,11 @@
   `(ambi-ps (*js-target*)
      (defun ,name (,@args) ,@body)))
 
+(defmacro defpsvar (name &optional init doc)
+  "Appends a JavaScript variable definition to *JS-TARGET*."
+  `(ambi-ps (*js-target*)
+     (defvar ,name ,@(when init `(,init)) ,@(when doc `(,doc)))))
+
 (defmacro defun+ps (name (&rest args) &body body)
   "Appends a JavaScript function definition to *JS-TARGET* and does a Lisp
    DEFUN."

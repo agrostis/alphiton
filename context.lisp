@@ -8,6 +8,21 @@
   (defvar *capacity-guards* '()
     "List of capacity guard variables.")
 
+  (defvar *capacity-exceeded*
+    (lambda (guard-name)
+      (error "Mex ~(~A~) capacity exceeded" guard-name))
+    "Function to call when capacity is exceeded.
+     It must accept one argument, a symbol describing the capacity that was
+     exceeded.  The default behvaiour is to signal an error.")
+
+  (defpsvar *capacity-exceeded*
+    (lambda (guard-name)
+      (throw
+        (new (*error (interpolate "Mex #{guard-name} capacity exceeded")))))    
+    "Function to call when capacity is exceeded.
+     It must accept one argument, a symbol describing the capacity that was
+     exceeded.  The default behvaiour is to signal an error.")
+
   (defmacro+ps with-capacity-guards ((&rest bindings) &body body)
     "Run BODY with capacity guard variables bound locally."
     (let ((bindings+ (loop for capsym :in *capacity-guards*
@@ -29,7 +44,8 @@
            (let ((guard-name ',name) (capsym ',capsym))
              `(if (> (decf ,capsym) 0)
                   (,op ,@args)
-                  (capacity-exceeded ',guard-name)))))))
+                  (when *capacity-exceeded*
+                    (funcall *capacity-exceeded* ',guard-name))))))))
 
   (defmacro+ps defstruct-guarded ((&whole name-and-options
                                    name &rest options)
@@ -50,10 +66,6 @@
           `(defstruct ,name-and-options ,@slots))))
 
 )
-
-#| TBD >>> |#
-(defun capacity-exceeded (guard-name)
-  (error "Mex ~(~A~) capacity exceeded" guard-name))
 
 
 ;;; Contexts

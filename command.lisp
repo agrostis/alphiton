@@ -129,7 +129,7 @@
                  (loop for cmd :across commands
                        do (setf all-commands
                                   (adjoin-command
-                                    cmd commands *adjoin-supersede*))))
+                                    cmd all-commands *adjoin-supersede*))))
                (merge-ctx (context)
                  (when (command-table context)
                    (merge-commands
@@ -266,7 +266,7 @@
       with delim-tokens := (delimiter-tokens delimiter)
       with length := (length delim-tokens)
       for i :from 0 :below length
-      for tok := (next-token token-source context)
+      for tok := (next-token/shift token-source context)
       if (not (token-equal tok (elt delim-tokens i)))
         return nil
       finally (return
@@ -315,6 +315,7 @@
         (next-group token-source context)
       (and (not (or input-error
                     (funcall *group-end-p* input-elt)
+                    (par-break-p input-elt)
                     (eot-p input-elt)))
            (if (group-p input-elt)
                (make-partial-match
@@ -552,11 +553,10 @@
                           (setf ,token-source ,tsrc))
                else
                  do (setf ,pstate (mex-dispatch ,tok0 ,tsrc ,context nil))
-               if (accumulator ,pstate)
-                 do (setf ,token-source (token-source-state ,pstate))
-                 and return (accumulator ,pstate)
-               else
-                 do (setf ,tsrc (token-source-state ,pstate))))))
+                    (setf ,tsrc (token-source-state ,pstate))
+               if (not (parser-value ,pstate))
+                 return (progn (setf ,token-source ,tsrc)
+                               ,tok0)))))
 
   (defmacro next-group/expand (token-source context)
     "Like NEXT-GROUP/SHIFT, but expand parameters and remove protective
@@ -567,18 +567,17 @@
                with ,pstate
                for ,grp0 := (next-group/shift ,tsrc ,context t)
                if (group-p ,grp0)
-                 return (prog1 ,grp0
-                          (setf ,token-source ,tsrc))
+                 return (progn (setf ,token-source ,tsrc)
+                               ,grp0)
                else if (special-command-p ,grp0 "noexpand")
                  return (prog1 (next-token/shift ,tsrc ,context)
                           (setf ,token-source ,tsrc))
                else
                  do (setf ,pstate (mex-dispatch ,grp0 ,tsrc ,context nil))
-               if (accumulator ,pstate)
-                 do (setf ,token-source (token-source-state ,pstate))
-                 and return (accumulator ,pstate)
-               else
-                 do (setf ,tsrc (token-source-state ,pstate))))))
+                    (setf ,tsrc (token-source-state ,pstate))
+               if (not (parser-value ,pstate))
+                 return (progn (setf ,token-source ,tsrc)
+                               ,grp0)))))
 
 )
 

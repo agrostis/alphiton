@@ -84,7 +84,7 @@
                                               (group-token-count sub)
                                               1))
                                 (if term 2 1))))
-                   (parser-accumulator-state tsrc+ group))))))
+                   (parser-accumulator-state tsrc+ grp))))))
         ((and (rbrace-token-p tok0)
               (not (eq *group-end-p* #'rbrace-token-p))
               *verify-group-balance*)
@@ -122,7 +122,8 @@
           if (special-command-p sub "noexpand")
             do (setq sub (next-token/shift token-source context nil)
                      noexpand t)
-          else if (funcall *group-end-p* sub)
+          else if (and (not (eq *group-end-p* #'eot-p))
+                       (funcall *group-end-p* sub))
             return (parser-accumulator-state token-source
                      (and (not ship) (ensure-vector contents))
                      sub)

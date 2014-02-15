@@ -456,7 +456,7 @@
   "Make a fresh copy of TABLE."
   (loop with copy := (make-hash-table :test #'equal)
         for key :being each hash-key of table :using (hash-value datum)
-        do (setf (gethash key table) datum)
+        do (setf (gethash key copy) datum)
         finally (return table)))
 
 (defpsmacro copy-table (table)

@@ -36,14 +36,20 @@
                    (let ((msg (ensure-vector (error-display-message orig))))
                      (cond
                        (prepend-message
-                        (spliced msg 0 0
-                                 (ensure-vector prepend-message)))
+                        (if (vectorp (aref* prepend-message 0))
+                            (vector-add prepend-message msg)
+                            (spliced msg 0 0
+                                     (ensure-vector prepend-message))))
                        (append-message
-                        (spliced msg (length msg) 0
-                                 (ensure-vector append-message)))
+                        (if (vectorp (aref* append-message 0))
+                            (vector-add msg append-message)
+                            (spliced msg (length msg) 0
+                                     (ensure-vector append-message))))
                        (t msg)))
-                   (let ((msg (or prepend-message append-message)))
-                     (and msg (vector (ensure-vector msg)))))))
+                   (let* ((msg0 (or prepend-message append-message))
+                          (msg (and msg0 (ensure-vector msg0))))
+                     (when msg
+                       (if (vectorp (aref* msg 0)) msg (vector msg)))))))
 
   (defmacro error-display* (&rest args)
     "Wrapper for using MAKE-ERROR-DISPLAY and ERROR-DISPLAY-ADD with error
@@ -235,9 +241,7 @@
                              (loop
                                for c :across src
                                do (push-token (token* :char c))))
-                            ((:newline)
-                             (push-token (token* :newline src)))
-                            ((:command :param)
+                            ((:char :newline :command :param)
                              (push-token (token* type src)))
                             (t (error "Invalid TOKENS* type: ~S" type)))
                           (setf input input+)))))
@@ -367,7 +371,8 @@
                      :start tok-start :end tok-end :context context
                      :category cat :chr chr :chr2 chr2
                      ;; Empty lines generally denote paragraph breaks
-                     :par-end past-empty-lines)))))
+                     :par-end (unless (eq past-empty-lines tok-end)
+                                past-empty-lines))))))
         (if (and c+
                  (ccat-constituent-p cat *ccat-newline*)
                  (ccat-constituent-p (char-cat c+) *ccat-newline*)
@@ -380,18 +385,21 @@
      CONT on the position after it.  If it is an escape character followed
      by a newline token, call CONT on the position of the first
      non-whitespace after the newline.  Otherwise, call CONT on START."
-    (let ((cat (char-cat (char-at source start))))
+    (let ((cat (and (< start (length source))
+                    (char-cat (char-at source start)))))
       (cond ((not (numberp cat))
              (funcall cont start))
             ((eq (ccat-base cat) *ccat-whitespace*)
              (funcall cont (1+ start)))
             ((eq (ccat-base cat) *ccat-escape*)
              (let* ((start+ (1+ start))
-                    (cat+ (char-cat (char-at source start+))))
+                    (cat+ (and (< start+ (length source))
+                               (char-cat (char-at source start+)))))
                (if (and (numberp cat+)
                         (eq (ccat-base cat+) *ccat-newline*))
                    (let* ((start++ (1+ start+))
-                          (cat++ (char-cat (char-at source start++)))
+                          (cat++ (and (< start++ (length source))
+                                      (char-cat (char-at source start++))))
                           (startln (if (and (ccat-constituent-p cat+)
                                             (numberp cat++)
                                             (ccat-constituent-p
@@ -843,7 +851,7 @@
   (defun parser-error-state (token-source error)
     "Return a parser state with an error."
     (make-parser-state :token-source-state token-source
-                       :error error))
+                       :parser-error error))
 
   (defmacro parser-error-state* (token-source &rest error-init)
     "Return a parser state with an error, instantiated with ERROR-DISPLAY*

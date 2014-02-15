@@ -164,12 +164,11 @@
                     (when brace (stack-push brace tokens)))
                   (unless (eot-p sub) (stack-push sub tokens)))
               (when (error-display-p sub)
-                (when (error-display-p errors)
-                  (setf errors
-                          (error-display*
-                            :add-to errors
-                            :append-input (tokens :chars "...")
-                            :append sub))))))
+                (setf errors
+                        (error-display*
+                          :add-to errors
+                          :sep (tokens :chars "...")
+                          :append sub)))))
         (make-parser-state :accumulator tokens :parser-error errors
                            :token-source-state tsrc+))))
 
@@ -198,7 +197,7 @@
                  (setf errors
                          (error-display*
                            :add-to errors
-                           :append-input (tokens :chars "...")
+                           :sep (tokens :chars "...")
                            :append sub))))))
         (make-parser-state :parser-value str :parser-error errors
                            :token-source-state tsrc+))))

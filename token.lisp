@@ -9,19 +9,26 @@
 
   (defun error-display-add (orig
                             &key prepend-input append-input replace-input
-                                 prepend-message append-message)
+                                 prepend-message append-message sep)
     "If ORIG is an error display, prepend or append the given input and
      message, as specified.  Otherwise, create a new error display with the
      given input, message and SHIFT-CONTEXT."
     (make-error-display
-      :faulty-input (let ((fi (if (error-display-p orig)
-                                  (error-display-faulty-input orig)
-                                  (ensure-vector orig))))
+      :faulty-input (let* ((fi (if (error-display-p orig)
+                                   (error-display-faulty-input orig)
+                                   (ensure-vector orig)))
+                           (sep* (if (and sep (> (length fi) 0))
+                                     (ensure-vector sep)
+                                     (vector))))
                       (cond
+                        ((and prepend-input append-input)
+                         (vector-add (ensure-vector prepend-input)
+                                     sep* fi sep*
+                                     (ensure-vector append-input)))
                         (prepend-input
-                         (vector-add (ensure-vector prepend-input) fi))
+                         (vector-add (ensure-vector prepend-input) sep* fi))
                         (append-input
-                         (vector-add fi (ensure-vector append-input)))
+                         (vector-add fi sep* (ensure-vector append-input)))
                         (replace-input
                          (ensure-vector replace-input))
                         (t fi)))
@@ -80,7 +87,8 @@
                         ,@(opt args* :append-message :append t)
                         ,@(opt args* :prepend-input :prepend nil)
                         ,@(opt args* :append-input :append nil)
-                        ,@(opt args* :replace-input nil nil))))
+                        ,@(opt args* :replace-input nil nil)
+                        ,@(opt args* :sep nil nil))))
           `(make-error-display
              :message (vector ,(tokens** :command (car args)))
              :faulty-input ,(arg-vector (cdr args))))))

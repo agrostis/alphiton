@@ -143,32 +143,42 @@
      every ancestor of CONTEXT to the locale whose id is LOCALE-ID.
      Return non-NIL iff the current locale could be actually set in any
      context."
-    (let* ((locales (locale-table context))
-           (locale-command-table (lookup locale-id locales))
-           (st (and locale-command-table
-                    (remember "" locales locale-command-table)))
-           (parent-st (and (parent-context context)
-                           (set-context-locale (parent-context context)
-                                               locale-id))))
-      (or st parent-st)))
+    (let* ((parent-status
+            (and (parent-context context)
+                 (set-context-locale (parent-context context) locale-id)))
+           (locales
+            (locale-table context))
+           (locale-command-table
+            (or (and locales (lookup locale-id locales))
+                (and parent-status
+                     (remember locale-id locales
+                               (make-table "" locale-id)))))
+           (status
+            (when locale-command-table
+              (remember "" locales locale-command-table)
+              t)))
+      (or status parent-status)))
 
   (defun add-context-locale (context locale-id &optional proto)
     "Add a new entry to the locale table of CONTEXT, binding LOCALE-ID to a
      fresh localized command table.  If PROTO (a locale id) is supplied,
      the localized command table shall be a copy of that locale's command
      table; otherwise, it shall be an empty table."
-    (let* ((locales (locale-table context))
-           (proto-command-table (and proto (lookup proto locales))))
-      (unless (lookup locale-id locales)
-        (let ((locale-command-table
-               (if proto
-                   (and proto-command-table
-                        (remember locale-id locales
-                                  (copy-table proto-command-table)))
-                   (remember locale-id locales (make-table)))))
-          (when locale-command-table
-            (remember "" locale-command-table locale-id)
-            (remember "" locales locale-command-table))))))
+    (bind/init ((locales (locale-table context) (make-table)))
+      (let* ((proto-command-table (and proto (lookup proto locales))))
+        (if (lookup locale-id locales)
+            (set-context-locale context locale-id)
+            (let ((locale-command-table
+                   (if proto
+                       (and proto-command-table
+                            (remember locale-id locales
+                                      (copy-table proto-command-table)))
+                       (remember locale-id locales (make-table)))))
+              (when locale-command-table
+                (when (parent-context context)
+                  (set-context-locale (parent-context context) locale-id))
+                (remember "" locale-command-table locale-id)
+                (remember "" locales locale-command-table)))))))
 
   (defvar *default-locale* "en_US"
     "The lingua franca.")

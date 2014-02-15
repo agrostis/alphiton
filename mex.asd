@@ -4,7 +4,8 @@
   (:use #:cl #:asdf))
 (in-package #:mex-system)
 
-(defclass load-mex-prologue-op (operation)
+(defclass load-mex-prologue-op (#+asdf3.1 selfward-operation
+                                #-asdf3.1 operation)
   ())
 
 (defmethod output-files ((op load-mex-prologue-op) component)

@@ -83,6 +83,23 @@
   `(form-with-var-value ,var (lambda (,var) ,form)))
 
 
+;; Booleans
+
+(defun+ps true-p (thing)
+  "Return true iff THING is the boolean true."
+  (eq thing t))
+
+(defun false-p (thing)
+  "Return true iff THING is the boolean false."
+  (eq thing nil))
+
+(defpsfun false-p (thing)
+  "Return true iff THING is the boolean false."
+  (or (eq thing false)
+      (eq thing null)
+      (eq thing undefined)))
+
+
 ;; Numbers
 
 (defun ensure-integer (str)
@@ -165,6 +182,26 @@
     ((stringp thing) thing)
     ((vectorp thing) ((@ thing join) ""))
     (t ((@ thing to-string)))))
+
+(defun upcase (string-or-char)
+  "Return the uppercase equivalent of the argument."
+  (if (characterp string-or-char)
+      (char-upcase string-or-char)
+      (string-upcase string-or-char)))
+
+(defpsmacro upcase (string)
+  "Return the uppercase equivalent of the argument."
+  `((@ ,string to-upper-case)))
+
+(defun downcase (string-or-char)
+  "Return the lowercase equivalent of the argument."
+  (if (characterp string-or-char)
+      (char-downcase string-or-char)
+      (string-downcase string-or-char)))
+
+(defpsmacro downcase (string)
+  "Return the lowercase equivalent of the argument."
+  `((@ ,string to-lower-case)))
 
 (defmacro+ps interpolate (template)
   "Construct string from TEMPLATE which may contain interpolations of the
@@ -276,6 +313,9 @@
       (with-ps-gensyms (i)
         `(let ((,i ((@ ,seq index-of) ,thing)))
            (and (>= ,i 0) (aref ,seq ,i))))))
+
+(defpsmacro endp (seq)
+  `(= (length ,seq) 0))
 
 (defun vector-add (vec0 &rest vectors)
   "Return a new array of all the argument arrays concatenated together."
@@ -452,6 +492,14 @@
   "Create a new lookup table and initialize it with DATA."
   `(create ,@data))
 
+(defun tablep (thing)
+  "Return true iff THING is a table."
+  (hash-table-p thing))
+
+(defpsmacro tablep (thing)
+  "Return true iff THING is a table."
+  `(objectp ,thing))
+
 (defun copy-table (table)
   "Make a fresh copy of TABLE."
   (loop with copy := (make-hash-table :test #'equal)
@@ -491,6 +539,32 @@
 (defpsmacro forget (key table)
   "Remove KEY with its associated value from TABLE."
   `(delete (getprop ,table ,key)))
+
+(defun table-equal (a b test-fn)
+  "Return true iff the tables A and B have the same number of entries, and
+   every pair of entries with equal keys in A and B store values which are
+   the same under TEST-FN."
+  (and (= (hash-table-count a) (hash-table-count b))
+       (loop for k :being each hash-key :of a
+             using (hash-value va)
+             always (multiple-value-bind (vb b-has-k) (gethash k b)
+                      (and b-has-k (funcall test-fn va vb))))))
+
+(defpsfun table-equal (a b test-fn)
+  "Return true iff the tables A and B have the same number of entries, and
+   every pair of entries with equal keys in A and B store values which are
+   the same under TEST-FN."
+  (let ((count 0))
+    (for-in (prop a)
+      (when ((@ a has-own-property) prop)
+        (if (and ((@ b has-own-property) prop)
+                 (funcall test-fn (getprop a prop) (getprop b prop)))
+            (incf count)
+            (return-from table-equal nil))))
+    (for-in (prop b)
+      (when ((@ b has-own-property) prop)
+        (decf count)))
+    (= count 0)))
 
 
 ;; Data templates

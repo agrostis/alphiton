@@ -4,8 +4,11 @@
   (:use #:cl #:asdf))
 (in-package #:mex-system)
 
-(defclass load-mex-prologue-op (#+asdf3.1 selfward-operation
-                                #-asdf3.1 operation)
+(when (find-class 'selfward-operation nil)
+  (pushnew :asdf-selfward-op *features*))
+
+(defclass load-mex-prologue-op (#+asdf-selfward-op selfward-operation
+                                #-asdf-selfward-op operation)
   ())
 
 (defmethod output-files ((op load-mex-prologue-op) component)

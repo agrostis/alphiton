@@ -205,7 +205,8 @@
      pattern."
     (let ((pattern (command-pattern command))
           (tsrc0-ctx (expansion-context token-source))
-          (ctab (category-table context)))
+          (ctab (category-table context))
+          (stacks (dom-stack context)))
       (if (functionp pattern)
           (let ((match (make-command-match
                          :parser-value command
@@ -254,6 +255,7 @@
                         :match-context (spawn-context tsrc0-ctx
                                            (guarded context)
                                          :category-table ctab
+                                         :dom-stack stacks
                                          :command-table bindings)
                         :match-length match-length
                         :matched-token-count matched-token-count))))))

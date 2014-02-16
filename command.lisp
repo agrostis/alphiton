@@ -457,6 +457,87 @@
 
   #| TBD: recursion guards |#
 
+#|
+@BEGIN TEST MACRO-DEF
+@MEX
+\def\bar#1\baz{bar: <#1>}
+\def\foo\baz#X#Y#Z{foo.xyz: <#X> <#Y> <#Z>}
+\def\foo#Q\baz#Q\quux#Q{foo.qqq: <#Q>}
+\def\mac#\knack{mac: <#\knack>}
+@JSON
+{"t": "\n\n\n"}
+@END TEST
+
+@BEGIN TEST MACRO-MATCH-1
+@USE MACRO-DEF
+@MEX
+\bar one\baz , \bar{another}\baz , \foo\baz two , \foo\baz{three}+{four}
+@JSON
+{"t": "bar: <one>, bar: <another>, foo.xyz: <t> <w> <o> , foo.xyz: <three> <+> <four>"}
+@END TEST
+
+@BEGIN TEST MACRO-MATCH-2
+@USE MACRO-DEF
+@MEX
+\mac5 , \foo{s}\baz{i}\quux{x} , \bar\baz , \foo7\baz\quux8
+@JSON
+{"t": "mac: <5> , foo.qqq: <six> , bar: <>, foo.qqq: <78>"}
+@END TEST
+
+@BEGIN TEST MACRO-BEST-MATCH
+@USE MACRO-DEF
+@MEX
+\foo\baz1234
+
+\def\foo\baz#P#Q#R#S{foo.pqrs: <#P> <#Q> <#R> <#S>}
+\foo\baz1234
+
+\def\quux{7}
+\foo\baz56\quux8 , \foo\baz56{\quux}8
+@JSON
+{"t": "foo.xyz: <1> <2> <3>4\n\nfoo.pqrs: <1> <2> <3> <4>\n\nfoo.qqq: <568> , foo.pqrs: <5> <6> <7> <8>"}
+@END TEST
+
+@BEGIN TEST MACRO-MISMATCH
+@USE MACRO-DEF
+@MEX
+\bar blah
+\mac
+
+\bogus
+@JSON
+[
+ @ERROR IN "\\bar" ("No matching definition"),
+ {"t": "blah\n"},
+ @ERROR IN "\\mac" ("No matching definition"),
+ {"t": "\n"},
+ @ERROR IN "\\bogus" ("Undefined command")
+]
+@END TEST
+
+@BEGIN TEST SCOPE-1
+@MEX
+\def\wrapI#\LOC{#\LOC{wrapI}}
+\def\wrapII#\LOC{#\LOC{wrapII}}
+\def\here#\NAME{This is in #\NAME.}
+\def\there#\NAME{That is in #\NAME.}
+\wrapI{\here} \wrapI{\there} \wrapII{\here} \wrapII{\there}
+@JSON
+{"t": "\n\n\n\nThis is in wrapI. That is in wrapI. This is in wrapII. That is in wrapII."}
+@END TEST
+
+@BEGIN TEST SCOPE-2
+@MEX
+\def\wrapParam{#\loc{wrapParam}}
+\def\wrapCmd{\loc{wrapCmd}}
+\def\loc#\NAME{Top loc referenced in #\NAME.}
+\wrapCmd{} \wrapParam{}
+{\def\loc#\NAME{Group loc referenced in #\NAME.} \wrapCmd{} \wrapParam{}}
+@JSON
+{"t": "\n\n\nTop loc referenced in wrapCmd. Top loc referenced in wrapParam.\n Top loc referenced in wrapCmd. Group loc referenced in wrapParam."}
+@END TEST
+|#
+
   (defvar *unexpandable* '()
     "List of command and active tokens that should not expand,
      notwithstanding the general rule.")
@@ -584,6 +665,16 @@
                                ,grp0)))))
 
 )
+
+#|
+@BEGIN TEST NOEXPAND
+@MEX
+\def\foo{Foo!} \noexpand\foo
+\def\expand{Expanded: <\noexpand\foo>} \expand
+@JSON
+{"t": " \\foo\n Expanded: <Foo!>"}
+@END TEST
+|#
 
 (defmethod print-object ((builtin builtin) stream)
   (if *print-readably* (call-next-method)

@@ -230,6 +230,26 @@
                 (group-start group) (group-end group)
                 (group-token-count group)))))
 
+#|
+@BEGIN TEST GROUPS-ONLY
+@MEX
+Lorem {ipsum {dolor sit}} amet.
+@JSON
+{"t": "Lorem ipsum dolor sit amet."}
+@END TEST
+
+@BEGIN TEST UNBALANCED-GROUPS
+@MEX
+Lorem} {ipsum {dolor sit} amet.
+@JSON
+[{"t": "Lorem"},
+ @ERROR IN "}" ("Hanging right brace"),
+ {"t": " ipsum dolor sit amet."},
+ @ERROR IN "" @EOT ("EOT occurred inside a group")
+]
+@END TEST
+|#
+
 ;;; Local Variables: ***
 ;;; mode:lisp ***
 ;;; local-font-lock-keywords:(("(\\(def\\(?:\\(ps\\(?:macro\\|fun\\)\\|\\(?:un\\|macro\\)\\+ps\\)\\|\\(guard\\|enum\\)\\|\\(struct-guarded\\)\\)\\)[ \t\n]+(?\\([^()]*?\\)[ \t\n]" (1 font-lock-keyword-face) (5 (cond ((match-beginning 2) font-lock-function-name-face) ((match-beginning 3) font-lock-variable-name-face) ((match-beginning 4) font-lock-type-face)))) ("(\\(ambi-ps\\)\\_>" (1 font-lock-preprocessor-face))) ***

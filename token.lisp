@@ -908,6 +908,26 @@
 
 )
 
+#|
+@BEGIN TEST TOKENS-ONLY
+@MEX ((MEX::*UNEXPANDABLE* T))
+Lorem ipsum ##
+dolor\
+   sit \amet.
+@JSON
+{"t": "Lorem ipsum #\ndolor sit \\amet."}
+@END TEST
+
+@BEGIN TEST UNFINISHED-TOKEN
+@MEX
+Lorem ipsum dolor #\
+@JSON
+[{"t": "Lorem ipsum dolor "},
+ @ERROR IN "#\\" @EOT ("EOT occurred while parsing command token" "EOT occurred while parsing parameter token")
+]
+@END TEST
+|#
+
 
 (defmethod print-object ((tsrc token-source) stream)
   (if *print-readably* (call-next-method)

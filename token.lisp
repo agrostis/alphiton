@@ -908,6 +908,28 @@
 
 )
 
+
+(defmethod print-object ((tsrc token-source) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (tsrc stream :type t :identity t)
+        (when (char-source tsrc)
+          (format stream "~D/~D chars"
+            (char-source-offset tsrc) (length (char-source tsrc))))
+        (when (and (char-source tsrc) (cached-tokens tsrc))
+          (format stream ", "))
+        (when (cached-tokens tsrc)
+          (format stream "~D/~D cached tokens"
+            (cached-token-offset tsrc) (length (cached-tokens tsrc)))))))
+
+(defmethod print-object ((pstate parser-state) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (pstate stream :type t :identity t)
+        (parser-state-bind (:accumulator acc :terminator trm :value val
+                            :error err :token-source tsrc) pstate
+          (format stream "~:[-~;V~]~:[-~;A~]~:[-~;T~]~:[-~;E~] at ~S"
+            val acc trm err tsrc)))))
+
+
 ;;; Local Variables: ***
 ;;; mode:lisp ***
 ;;; local-font-lock-keywords:(("(\\(def\\(?:\\(ps\\(?:macro\\|fun\\)\\|\\(?:un\\|macro\\)\\+ps\\)\\|\\(guard\\|enum\\)\\|\\(struct-guarded\\)\\)\\)[ \t\n]+(?\\([^()]*?\\)[ \t\n]" (1 font-lock-keyword-face) (5 (cond ((match-beginning 2) font-lock-function-name-face) ((match-beginning 3) font-lock-variable-name-face) ((match-beginning 4) font-lock-type-face)))) ("(\\(ambi-ps\\)\\_>" (1 font-lock-preprocessor-face))) ***

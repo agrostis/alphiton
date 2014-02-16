@@ -585,6 +585,48 @@
 
 )
 
+(defmethod print-object ((builtin builtin) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (builtin stream :type t :identity t)
+        (if (vectorp (command-pattern builtin))
+            (format stream "~@[~A~] => ~S"
+              (input-to-string
+                (pattern-tokens (coerce (command-pattern builtin) 'list)))
+              (builtin-handler builtin))
+            (format stream "~S ~S"
+              (command-pattern builtin)
+              (builtin-handler builtin))))))
+
+(defmethod print-object ((macro macro) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (macro stream :type t :identity t)
+        (format stream "~@[~A~] => ~A"
+                (input-to-string
+                  (pattern-tokens (coerce (command-pattern macro) 'list)))
+                (input-to-string (macro-expansion macro))))))
+
+(defmethod print-object ((match command-match) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (match stream :type t :identity t)
+        (parser-state-bind (:accumulator acc :terminator trm :value cmd
+                            :error err :token-source tsrc) match
+          (format stream "~S +~D (~D) ~:[-~;A~]~:[-~;T~]~:[-~;E~] ~
+                          on ~S at ~S"
+            (input-to-string (dispatching-token match))
+            (match-length match)
+            (matched-token-count match)
+            acc trm err cmd tsrc)))))
+
+(defmethod print-object ((match partial-match) stream)
+  (if *print-readably* (call-next-method)
+      (print-unreadable-object (match stream :type t :identity t)
+        (parser-state-bind (:accumulator acc :token-source tsrc) match
+          (format stream "+~D (~D) ~@[~A ~]at ~S"
+            (delta-match-length match)
+            (delta-token-count match)
+            (when acc (input-to-string acc))
+            tsrc)))))
+
 
 ;;; Builtins
 

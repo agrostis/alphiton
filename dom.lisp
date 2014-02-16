@@ -38,6 +38,68 @@
   (or (dom-element-p thing) (dom-text-p thing) (dom-comment-p thing)
       (dom-recipe-p thing)))
 
+(defvar *dom-print-recursive* nil)
+
+(defmethod print-object ((element dom-element) stream)
+  (if *print-readably* (call-next-method)
+      (let ((id (ignore-errors
+                   (let ((s (with-output-to-string (out)
+                              (print-unreadable-object
+                                  (element out :type nil :identity t)))))
+                     (parse-integer s
+                       :start (position-if #'alphanumericp s)
+                       :radix 16 :junk-allowed t))))
+            (name (element-name element))
+            (attrs (element-attributes element))
+            (content (element-content element)))
+        (format stream "~:[#<DOM:~;<~]~:@(~A~)~@[ lisp:id='~X'~]"
+                *dom-print-recursive* name id)
+        (when attrs
+          (maphash (lambda (name val)
+                     (format stream " ~(~A~)='~A'" name val))
+                   attrs))
+        (if content
+            (progn
+              (princ ">" stream)
+              (let ((*dom-print-recursive* t))
+                (map nil
+                  (lambda (sub) (when sub (write sub :stream stream)))
+                  content))
+              (format stream "</~:[DOM:~;~]~:@(~A~)>"
+                      *dom-print-recursive* name))
+            (princ "/>" stream)))))
+
+(defmethod print-object ((text dom-text) stream)
+  (if *print-readably* (call-next-method)
+      (if *dom-print-recursive*
+          (loop for c :across (text-content text)
+                do (princ (case c
+                            (#\< "&lt;") (#\> "&gt;") (#\& "&amp;") (t c))
+                          stream))
+          (format stream "#<[CDATA[~A]]>" (text-content text)))))
+
+(defmethod print-object ((comment dom-comment) stream)
+  (if *print-readably* (call-next-method)
+      (let ((content (comment-content comment)))
+        (format stream "~:[#~;~]<!-- " *dom-print-recursive*)
+        (let ((*dom-print-recursive* t))
+          (write
+            (if (dom-p content) content
+                (make-dom-text :content (princ-to-string content)))
+            :stream stream))
+        (princ " -->" stream))))
+
+(defmethod print-object ((recipe dom-recipe) stream)
+  (if *print-readably* (call-next-method)
+      (let ((hname (recipe-handler-name recipe))
+            (data (recipe-data recipe)))
+        (format stream "~:[#~;~]<? DOM:RECIPE ~A "
+                *dom-print-recursive* hname)
+        (let ((*dom-print-recursive* nil)
+              (*print-pretty* nil))
+          (write data :stream stream))
+        (princ " ?>" stream))))
+
 
 ;; DOM to JSON to DOM
 

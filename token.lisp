@@ -775,6 +775,11 @@
              if (not (and (eot-p ,tok) ,token-source-location))
                return ,tok)))
 
+  (defun next-token* (token-source context &optional (expand-aliases t))
+    "Extract and return next token from the source at TOKEN-SOURCE-LOCATION,
+     skipping over EOTs on token source child-to-parent transition."
+    (next-token/shift token-source context expand-aliases))
+
   (defun next-char (token-source context)
     "Extract and return just one character from TOKEN-SOURCE."
     (or (and (char-source token-source)
@@ -783,14 +788,11 @@
                 (length (char-source token-source)))
              (char-at (char-source token-source)
                       (char-source-offset token-source)))
-        (let ((tok (next-token token-source context nil)))
-          (if (eot-p tok)
-              (let ((tsrc+ (parent-source token-source)))
-                (and tsrc+ (next-char tsrc+ context)))
-              (and (token-p tok)
-                   (let ((str (input-to-string tok)))
-                     (and (> (length str) 0)
-                          (char-at str 0))))))))
+        (let ((tok (next-token* token-source context nil)))
+          (and (token-p tok) (not (eot-token-p tok))
+               (let ((str (input-to-string tok)))
+                 (and (> (length str) 0)
+                      (char-at str 0)))))))
 
   (defun source-after-next-char (token-source context)
     "Return a copy of TOKEN-SOURCE with offset(s) shifted by one character."

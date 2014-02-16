@@ -75,7 +75,7 @@
    result."
   (if (or (atom expr) (and (listp expr) (eq (car expr) '@)))
       (funcall form-fn expr)
-      (let ((var (gensym)))
+      (let ((var (ps-gensym)))
         `(let ((,var ,expr)) ,(funcall form-fn var)))))
 
 (defmacro with-var-value ((var) form)
@@ -695,12 +695,13 @@
                       for accessor :in accessors
                       nconc (list kwd `(,accessor struct))))))
          (defmacro ,(intern (format nil "MAKE-~a" name)) (&rest init-list)
-           (let ((obj ',name))
-             `(let ((instance (new (,obj))))
+           (let* ((obj ',name)
+                  (instance (ps-gensym (format nil "~a-" obj))))
+             `(let ((,instance (new (,obj))))
                 ,@(loop for (kwd value) :on init-list :by #'cddr
                         for slot = (intern (symbol-name kwd))
-                        collect `(setf (@ instance ,slot) ,value))
-                instance)))
+                        collect `(setf (@ ,instance ,slot) ,value))
+                ,instance)))
          (defmacro ,(intern (format nil "~a-P" name)) (thing)
            (let ((obj ',name))
              (form-with-var-value thing

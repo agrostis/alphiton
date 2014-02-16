@@ -2,7 +2,8 @@
 
 \comment -- Unprintable character aliases
 
-\alias\newline{
+\alias\carriagereturn{}
+\alias\linefeed{
 }
 \alias\blank{ }
 \alias\htab{	}
@@ -15,32 +16,29 @@
  /setcat/rbrace}/
 }
 
-\egroup
-
 \comment -- English error messages
 
-\setlang{en_US}
+\newlang{en_US}
 \lcdef\errmsg\emtyConditionalBranch{Empty branch in conditional}
-\lcdef\errmsg\eotBeforeExpected{EOT occurred before expected input}
 \lcdef\errmsg\eotInCommandToken{EOT occurred while parsing command token}
-\lcdef\errmsg\eotInConditional{EOT occurred inside a conditional}
 \lcdef\errmsg\eotInGroup{EOT occurred inside a group}
 \lcdef\errmsg\eotInParamToken{EOT occurred while parsing parameter token}
-\lcdef\errmsg\errorsInAliasOrEdef{Errors in \backslash alias / \backslash edef expansion}
+\lcdef\errmsg\errorsInAliasOrEdef{Errors in \backslash alias or\
+               \backslash edef expansion}
 \lcdef\errmsg\errorsInError{Errors in \backslash error expansion}
-\lcdef\errmsg\extraConditionalBranch{Extra branch after \backslash else in conditional}
-\lcdef\errmsg\hangingRpar{Hanging right parenthesis}
-\lcdef\errmsg\invalidCharToken{Not a character token}
-\lcdef\errmsg\invalidCommandInDef{Invalid command in definition}
+\lcdef\errmsg\extraConditionalBranch{Extra branch after \backslash else\
+               in conditional}
+\lcdef\errmsg\hangingRbrace{Hanging right brace}
 \lcdef\errmsg\invalidLocale{Invalid locale id}
-\lcdef\errmsg\invalidToken{Invalid token}
-\lcdef\errmsg\invalidInt{Invalid integer}
+\lcdef\errmsg\invalidStep{Invalid iteration step value}
 \lcdef\errmsg\noContextInput{Input has no associated context}
-\lcdef\errmsg\noCondition{No condition found}
+\lcdef\errmsg\noData{No data received for register initializer, condition,\
+               or in a similar context}
 \lcdef\errmsg\noLocale{Current locale unset}
 \lcdef\errmsg\noMatchingDef{No matching definition}
-\lcdef\errmsg\stackRotateBadScope#S{Invalid rotate scope: #S}
-\lcdef\errmsg\stackRotateBadValue#V{Invalid rotate value: #V}
+\lcdef\errmsg\patternMismatch{Pattern mismatch}
+\lcdef\errmsg\stackOpInvalidArgs#D{Data on stack are not valid arguments\
+               for this operation: #D}
 \lcdef\errmsg\stackUnderflow{Stack underflow}
 \lcdef\errmsg\undefined{Undefined command}
 \lcdef\errmsg\unfinishedDef{Unfinished definition}
@@ -51,3 +49,7 @@
 \def\bgroup{\noexpand{}
 \def\egroup{\noexpand}}
 
+
+\comment -- Make blanks, tabs and newlines insignificant
+
+\def\insignificantWhitespaces{\local\setcat\invalid\blank\local\setcat\invalid\linefeed\local\setcat\invalid\carriagereturn\local\setcat\invalid\htab}

@@ -23,6 +23,17 @@
     :handler
     (parser-expansion-state (token-source-state match) t))
 
+#|
+@BEGIN TEST COMMENT
+@MEX
+\comment: This is a comment
+\setcat+\active% \def%{\comment}
+% Now, this too is a comment
+@JSON
+{"t": " \n"}
+@END TEST
+|#
+
   (defbuiltin expandafter (tok1 tok2
                            :match match :dispatching dispatching
                            :context ctx)
@@ -102,6 +113,25 @@
              (and octx (parent-context octx)))))
       (replace-context tok parent-ctx match)))
 
+#|
+@BEGIN TEST REPLACE-CONTEXT
+@MEX
+\def\loc{outer} {\def\loc{middle} {\def\loc{inner}
+\loc{} vs. \global\loc{} vs. \parent\loc{}}}
+@JSON
+{"t": "  \ninner vs. outer vs. middle"}
+@END TEST
+
+@BEGIN TEST REPLACE-CONTEXT-FOR-DEF
+@MEX
+\def\loc{outer}
+{\def\loc{inner} \global\def\getloc{\loc}
+\global\def\redefloc{\local\def\loc{\loc}}}
+\getloc{} vs. \loc{} vs. \redefloc{}\loc{}
+@JSON
+{"t": "\n \n\ninner vs. outer vs. inner"}
+@END TEST
+|#
 
   (defbuiltin newlang (lcid proto-lcid
                        :match match :context ctx
@@ -144,6 +174,21 @@
           (parser-expansion-state tsrc t)
           (parser-error-state* tsrc "invalidLocale" dispatching lcid))))
 
+#|
+@BEGIN TEST MULTILANG
+@MEX
+\setcat\letter+\constituent é
+\newlang{fr_FR}\lcdef\bonté{Toute autre science est dommageable à celui qui n'a pas la science de la bonté.}
+\newlang{ru_RU}\lcdef\bonté{Тому, кто не постиг науки добра, всякая иная наука приносит лишь вред.}
+\setlang{en_US}\lcdef\bonté{All other knowledge is hurtful to him who has not the science of goodness.}
+\setlang{ru_RU}\bonté
+\newlang{et_EE}\bonté
+\newlang{fr_CH}\like{fr_FR}\bonté
+@JSON
+{"t": "\n\n\n\n\u0422\u043e\u043c\u0443, \u043a\u0442\u043e \u043d\u0435 \u043f\u043e\u0441\u0442\u0438\u0433 \u043d\u0430\u0443\u043a\u0438 \u0434\u043e\u0431\u0440\u0430, \u0432\u0441\u044f\u043a\u0430\u044f \u0438\u043d\u0430\u044f \u043d\u0430\u0443\u043a\u0430 \u043f\u0440\u0438\u043d\u043e\u0441\u0438\u0442 \u043b\u0438\u0448\u044c \u0432\u0440\u0435\u0434.\nAll other knowledge is hurtful to him who has not the science of goodness.\nToute autre science est dommageable \u00e0 celui qui n'a pas la science de la bont\u00e9."}
+@END TEST
+|#
+
   (defbuiltin csname (:match match :context ctx :dispatching dispatching)
     "Consume <Content>\\endcsname, where <Content> is any non-empty sequence
      of tokens not containing paragraph breaks.  Expand commands and
@@ -183,6 +228,17 @@
               :context (token-context dispatching)
               :name (input-to-string (accumulator expansion-pstate))
               :escape-chr #\\)))))
+
+#|
+@BEGIN TEST CSNAME
+@MEX
+\def\fire{char}\def\wood{coal}
+\def\charcoal{ashes}
+\csname\fire\wood\endcsname
+@JSON
+{"t": "\n\nashes"}
+@END TEST
+|#
 
   (defun match-definition (match context no-pattern)
     "Pattern matcher function for the builtins \\def, \\lcdef, \\edef and
@@ -347,6 +403,26 @@
               (parser-error-state* tsrc
                 "noContextInput" dispatching cmd-tok)))))
 
+#|
+@BEGIN TEST DEF-VS-EDEF
+@MEX
+\def\foo{outer}
+{\def\foo{inner}\parent\def\bydef{\local\foo}\parent\edef\byedef{\local\foo}}
+\bydef{} vs. \byedef{}
+@JSON
+{"t": "\n\nouter vs. inner"}
+@END TEST
+
+@BEGIN TEST EDEF-WITH-PARAMS
+@MEX
+\def\deffoobar#\X#\Y{\global\edef\foo#\Y{foo: <#\X> <#\Y>}\
+  \global\def\bar{bar: <#\Y>}}
+\deffoobar{one}{two}\def\Y{why?}
+\foo{five} ; \bar{}
+@JSON
+{"t": "\n \nfoo: <one> <five> ; bar: <why?>"}
+@END TEST
+|#
 
   (defbuiltin alias (cmd-tok content
                      :match match :context ctx :dispatching dispatching
@@ -381,6 +457,20 @@
               (parser-error-state* tsrc
                 "noContextInput" dispatching cmd-tok)))))
 
+#|
+@BEGIN TEST ALIAS
+@MEX
+\def\foo{Foo!}
+{\alias\emansc{\noexpand\noexpand\noexpand\endcsname} \csname foo\emansc}
+{\def\emansc{\endcsname} \csname foo\emansc}
+@JSON
+[{"t": "\n Foo!\n "},
+ @ERROR IN "\\csname" ("No matching definition"),
+ {"t": "foo"},
+ @ERROR IN "\\endcsname" ("Undefined command")]
+@END TEST
+|#
+
   (defbuiltin error (faulty-input message
                      :match match :context ctx :dispatching dispatching
                      :token-source tsrc)
@@ -411,6 +501,17 @@
                                       (group-contents faulty-input)
                                       (ensure-vector faulty-input))
                     :message (vector msg))))))))
+
+#|
+@BEGIN TEST ERROR
+@MEX
+\def\foo{Foo!}
+\error{\foo=#\foo}{Worse than a crime}
+@JSON
+[{"t": "\n"},
+ @ERROR IN "\\foo=Foo!" ("Worse than a crime")]
+@END TEST
+|#
 
   (defun match-ccat-spec (match context)
     "Pattern match function for the builtins \\setcat, \\chr, etc.
@@ -499,6 +600,17 @@
         (guarded-make-char-token
           :start (and pos (1- pos)) :end pos :context ctx
           :chr c :category cat))))
+
+#|
+@BEGIN TEST REPLACE-CCAT
+@MEX
+\setcat\lbrace[\setcat\rbrace]
+[\setcat\letter+\constituent{\setcat\letter+\constituent}\def\{}[{Foo!}] \{}]
+{\setcat+\active@\global\def@{Bar!}} \chr+\active@ \carriagereturn\linefeed
+@JSON
+{"t": "\n {Foo!}\n Bar! \r\n"},
+@END TEST
+|#
 
 )
 

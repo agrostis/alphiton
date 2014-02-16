@@ -73,3 +73,41 @@
                    (write-js
                      (merge-pathnames "mex.js"
                                       (component-pathname src)))))))
+
+(defun generate-tests (destination)
+  (labels ((get-files (component)
+             (typecase component
+               ((or system module)
+                (reduce #'append
+                  (mapcar #'get-files (component-children component))))
+               (cl-source-file
+                (list (component-pathname component))))))
+    (let ((generate-fn (ignore-errors
+                         (find-symbol "GENERATE-TESTS"
+                                      (find-package "MEX-TEST"))))
+          (mex-files (get-files (find-system '#:mex))))
+      (when (and generate-fn (fboundp generate-fn))
+        (funcall generate-fn destination mex-files)))))
+
+(defsystem #:mex.test
+  :name "Mex.Test"
+  :author "Boris Smilga <boris.smilga@gmail.com>"
+  :maintainer "Boris Smilga <boris.smilga@gmail.com>"
+  :licence "BSD"
+  :depends-on (#:mex #:eos #:cl-json)
+  :components
+    ((:module #:src
+        :pathname ""
+        :components ((:file "test-functions")))
+     (:module #:generated-tests
+        :pathname ""
+        :depends-on (#:src)
+        :components ((:file "generated-tests"))
+        :perform (prepare-op :before (op src)
+                   (generate-tests
+                     (component-pathname
+                       (car (component-children src))))))
+     (:module #:manual-tests
+        :pathname ""
+        :depends-on (#:src)
+        :components ())))

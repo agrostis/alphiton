@@ -110,4 +110,4 @@
      (:module #:manual-tests
         :pathname ""
         :depends-on (#:src)
-        :components ())))
+        :components ((:file "environment-tests")))))

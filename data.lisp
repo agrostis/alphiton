@@ -470,6 +470,18 @@
     (put-data (accumulator match) ctx)
     (parser-expansion-state tsrc t))
 
+#|
+@BEGIN TEST REGISTERS
+@MEX
+\register\foo=\false \register\bar=\int 42 \register\baz=\token\bar
+\foo\pop ; \baz\pop\pop
+\baz=\tokens quux}\endtokens
+{\baz\pop
+@JSON
+{"t": " \nfalse; 42\n\nquux"},
+@END TEST
+|#
+
 
   ;;; Token comparison
 
@@ -526,6 +538,27 @@
                            (ccat-active-p arg-cat)))))
       (put-data value ctx)
       (parser-expansion-state tsrc t)))
+
+#|
+@BEGIN TEST TOKEN-COMPARISONS
+@MEX
+\edef\foo{\backslash foo}
+\edef\bar{\backslash bar}
+\def\test#\TOKi#\TOKii{#\TOKi\if\is#\TOKi#\TOKii=\else≠\endif#\TOKii}
+\test\foo\foo; \test\foo\bar; \test12; \test22; \expandafter\test\chr\other11
+\def\testcat#\TOK{<#\TOK> is \if\iscommand#\TOK\
+  a command\elsif\ischr#\TOK\if\hascat\letter#\TOK\
+  a letter\elsif\hascat\number#\TOK\
+  a number digit\elsif\hascat\whitespace#\TOK\
+  a whitespace\else\
+  a special character\endif\
+  \if\hascat+\constituent#\TOK{} (constituent)\endif\endif}
+\testcat{\foo}; \testcat{7}; \testcat{Ω}; \testcat{美};
+\testcat{☺}; \testcat{ }; \testcat{ }
+@JSON
+{"t":"\n\n\n\\foo=\\foo; \\foo\u2260\\bar; 1\u22602; 2=2; 1\u22601\n\n<\\foo> is a command; <7> is a number digit; <\u03A9> is a letter (constituent); <\u7F8E> is a letter (constituent);\n<\u263A> is a special character; < > is a whitespace; <\u00A0> is a whitespace (constituent)"}
+@END TEST
+|#
 
 
   ;;; Operations on stacked arguments
@@ -678,6 +711,27 @@
       (put-data (stack-empty-p current) ctx)
       (parser-expansion-state tsrc t)))
 
+#|
+@BEGIN TEST STACK-OPS-1
+@MEX
+{\insignificantWhitespaces
+  \int1 \int2 \int3
+  \discard
+  \parent\register\x=\pop
+  \parent\register\y=\bottom
+  \discard
+  \parent\register\z=\bottom
+  \pop
+  \parent\register\err=\pop
+}
+\x\pop{} \y\pop{} \z\pop{}
+\err\pop{}
+@JSON
+[{"t":"\n2 false true\n"},
+ @ERROR IN "\\pop" ("Stack underflow")]
+@END TEST
+|#
+
   (defbuiltin dup (:match match :context ctx :dispatching dispatching
                    :token-source tsrc)
     "Duplicate the top element of the stack.  Expand to nothing."
@@ -709,6 +763,22 @@
             (parser-expansion-state tsrc t)))
       (parser-error-state tsrc
         (stack-op-error dispatching underflow scope value))))
+
+#|
+@BEGIN TEST STACK-OPS-2
+@MEX
+ABCDE\exch\dup \int5\int-3\roll \int4\int2\roll 42\roll\exch
+\int12\int3\roll
+\int-2\int5\roll
+@JSON
+[{"t":"ADCED"},
+ @ERROR IN "\\roll" ("Data on stack are not valid arguments for this operation: «4» «2»"),
+ {"t":"B\n"},
+ @ERROR IN "\\roll" ("Stack underflow"),
+ {"t":"\n"},
+ @ERROR IN "\\roll" ("Data on stack are not valid arguments for this operation: -2 5")] 
+@END TEST
+|#
 
   (defmacro defbuiltin-stack-funop (name operands expr)
     "Define a builtin NAME which pops as many elements of specified types

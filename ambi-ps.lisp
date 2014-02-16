@@ -57,7 +57,7 @@
     (with-open-file (out js-file :direction :output :if-exists :supersede)
       (princ *js-target* out))))
 
-(defpsmacro lisp* (form)
+(defmacro+ps lisp* (form)
   "Same as (LISP FORM), but used for its side effects rather than its
    value."
   `(lisp (progn ,form '(progn))))

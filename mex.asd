@@ -60,6 +60,7 @@
            (:file "command")
            (:file "core")
            (:file "data")
+           (:file "control")
            (:file "dom")
            (:static-file "prologue.mex")
            (:file "mex"

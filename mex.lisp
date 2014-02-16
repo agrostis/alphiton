@@ -24,18 +24,28 @@
                     (get-group-contents tsrc ctx t nil) 
                     ctx)))))
 
-  (defun mex (source)
+  (defun mex (source &optional want-context)
     (init-root-context)
     (with-capacity-guards ()
-      (let* ((ctx (guarded-make-opaque-context
-                    :category-table *category-table*
-                    :parent-context *root-context*))
+      (let* ((ctx (if (context-p want-context)
+                      want-context
+                      (guarded-make-opaque-context
+                        :category-table *category-table*
+                        :parent-context *root-context*)))
              (tsrc (make-token-source
                      :char-source source
                      :char-source-offset 0))
-             (previous-shipped nil)
-             (previous-shipped-count 0)
-             (ship (lambda (output ctx)
+             #+nil (previous-shipped nil)
+             #+nil (previous-shipped-count 0) 
+             (ship (unless want-context
+                     (lambda (output ctx)
+;                      (format *trace-output*
+;                              "~&******** Shipping ~S to ~S ********~%"
+;                              output ctx)
+                       (when (or (error-display-p output)
+                                 (token-p output))
+                         (context-stack-push output ctx))))
+               #+nil (lambda (output ctx)
                      (declare (ignore ctx))
                      (if (eq output previous-shipped)
                          (when (> (incf previous-shipped-count) 10)
@@ -45,10 +55,13 @@
                      (format *trace-output*
                              "~&******** Shipping ~S ********~%"
                              output))))
-        (destructuring-bind (no-cont eot no-tsrc)
+        (parser-state-bind (:error eot)
             (get-group-contents tsrc ctx t ship)
           (when (error-display-p eot)
             (funcall ship eot ctx)))
-        nil)))
+        (if want-context
+            ctx
+            (with-context-dom-stack (stacks ctx)
+              (dom-stack-get-root stacks))))))
 
 )

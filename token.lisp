@@ -595,7 +595,8 @@
     (:documentation "Convert arbitrary datum to input elements (tokens,
      groups, error displays, and/or sequences thereof).")
     (:method (thing context)
-      (string-to-input (ensure-string thing) context))
+      (string-to-input (ensure-string thing) context
+                       *plain-category-table*))
     (:method ((token token) context)
       (declare (ignore context))
       token)

@@ -5,6 +5,7 @@
 (ambi-ps ()
 
   (defstruct (error-display)
+    "An input element which is inserted when a processing error occurs."
     faulty-input message)
 
   (defun error-display-add (orig
@@ -151,36 +152,61 @@
 
   (ambi-ps ()
 
-    (defguard token 1000000)
+    (defguard token 1000000
+      "Only so many tokens of any kind allowed in a single processing run.")
 
     (defstruct-guarded (token (:guard token))
+      "A token that occured in input text between offsets START and END, and in
+       some given CONTEXT."
       start end context)
 
     (defstruct-guarded (char-token (:include token)
                                    (:conc-name token-)
                                    (:guard token))
+      "A character token representing character CHR categorized as CATEGORY
+       in its native context."
       chr category)
 
     (defstruct-guarded (newline-token (:include char-token)
                                       (:conc-name token-)
                                       (:guard token))
+      "A newline token.  If input has two-character line breaks (such as
+       CR+LF), they are stored in CHR and CHR2.  If the newline begins a
+       paragraph break, PAR-END stores the position of the last newline
+       before the next paragraph."
       chr2 par-end)
 
     (defstruct-guarded (command-token (:include token)
                                       (:conc-name token-)
                                       (:guard token))
+      "A command token with NAME (a string) escaped by ESCAPE-CHR."
       name escape-chr)
 
     (defstruct-guarded (param-token (:include token)
                                     (:conc-name token-)
                                     (:guard token))
+      "A parameter token with ARG-TOKEN escaped by PARAM-ESCAPE-CHR."
       arg-token param-escape-chr)
 
-    (defstruct-guarded (eot-token (:include token) (:guard token)))
+    (defstruct-guarded (eot-token (:include token) (:guard token))
+      "A token which signifies the end of input text.")
 
   )
 
   (defun token* (type src)
+    "Programmatically create and return a token.  Valid combinations of TYPE
+     and SRC are:
+       :CHAR <char> -- a character token, category computed according to
+     current *CATEGORY-TABLE*;
+       :NEWLINE <integer> and :NEWLINE NIL -- a newline token, argument
+     signifies PAR-END;
+       :COMMAND <string> -- a command token, argument signifies command
+     name, escape is \\;
+       :COMMAND <char> -- active character token, base category computed
+     according to current *CATEGORY-TABLE*;
+       :PARAM <string> and :PARAM <char> -- parameter token, escaped stuff
+     obtained by processing the argument as if with type :COMMAND above,
+     escape is #."
     (flet ((make-dispatch-token (name)
              (etypecase name
                (character
@@ -213,13 +239,11 @@
 
   (defun tokens* (&rest input)
     "Return a vector of tokens specified by arguments in INPUT which should
-     have the format <INPUT> ::= {(<INPUT>) | <TYPE> <SRC>}*.  A <TYPE> of
-     :CHARS with a string <SRC> produces a sequence of character tokens; a
-     <TYPE> of :COMMAND with a string <SRC> produces one command token with
-     the name <SRC>, whereas with a char <SRC> it produces an active
-     character token; a <TYPE> of :PARAM produces one parameter token over a
-     command or active character token; and a list (<INPUT>) produces tokens
-     framed by left and right brace tokens."
+     have the format <INPUT> ::= {(<INPUT>) | <TYPE> <SRC>}*, where <TYPE>
+     is a keyword.  <TYPE> <SRC> tuples are passed to TOKEN* to produce
+     tokens, except that a type of :CHARS with a string <SRC> produces a
+     sequence of character tokens; and a list (<INPUT>) produces tokens
+     framed by left and right braces (i. e., a group)."
     (let ((tokens (make-stack)) (i 0))
       (labels ((push-token (tok)
                  (setf (token-start tok) i
@@ -287,7 +311,7 @@
 
   (defgeneric eot-p (thing)
     (:documentation "Return true iff THING signifies an end of text.")
-    (:method (thing) nil)
+    (:method (thing) (declare (ignore thing)) nil)
     (:method ((tok eot-token)) t)
     (:method ((ed error-display)) (eot-p (faulty-input-last ed))))
 
@@ -297,18 +321,18 @@
 
   (defgeneric par-break-p (thing)
     (:documentation "Return true iff THING signifies a paragraph break.")
-    (:method (thing) nil)
+    (:method (thing) (declare (ignore thing)) nil)
     (:method ((tok newline-token)) (token-par-end tok)))
 
   (defgeneric input-start (thing)
     (:documentation "Return the character position where THING starts.")
-    (:method (thing) nil)
+    (:method (thing) (declare (ignore thing)) nil)
     (:method ((tok token)) (token-start tok))
     (:method ((ed error-display)) (input-start (faulty-input-first ed))))
 
   (defgeneric input-end (thing)
     (:documentation "Return the character position where THING ends.")
-    (:method (thing) nil)
+    (:method (thing) (declare (ignore thing)) nil)
     (:method ((tok token)) (token-end tok))
     (:method ((tok newline-token)) (or (token-par-end tok) (token-end tok)))
     (:method ((ed error-display)) (input-end (faulty-input-last ed))))
@@ -319,8 +343,7 @@
 
   (defun token-at (source position context)
     "Return the token which can be parsed out from the string SOURCE at
-     POSITION, assuming the character categories in CONTEXT.  If EXPAND is
-     true, store the token in the token cache."
+     POSITION, assuming the character categories in CONTEXT."
     (if (or (not source) (>= position (length source)))
         (guarded-make-eot-token :start position :end position)
         (let* ((c (char-at source position))
@@ -359,7 +382,6 @@
                             (t (funcall cont))))))
 
   (defun newline-token-at (source position context c cat)
-    (declare (ignore context))
     "Parse SOURCE at POSITION for a newline token."
     (let* ((position+ (1+ position))
            (c+ (and (< position+ (length source))
@@ -513,6 +535,8 @@
         (and (eot-token-p a) (eot-token-p b))))
 
   (defmacro token-is (a b-type b-src)
+    "Return true iff A is a token with the given specification (in the sence
+     of TOKEN*)."
     `(token-equal ,a ,(token** b-type b-src)))
 
   (defun token-context-equal (a b)
@@ -557,6 +581,8 @@
 
 (defun string-to-input (string context
                         &optional (table (category-table context)))
+  "Convert STRING to a sequence of character tokens with the given
+   native context."
   (loop for i :from 0 :below (length string)
         for c := (char-at string i)
         collect (make-char-token :start i :end (1+ i) :context context
@@ -632,11 +658,13 @@
       (token-command-key (token-arg-token token)))
     (:method ((token char-token))
       (string (token-chr token)))
-    (:method (any) ""))
+    (:method (anything)
+      (declare (ignore anything))
+      ""))
 
 )
 
-;;; Token sources
+;;; Token sources and parser states
 
 (ambi-ps ()
 
@@ -829,6 +857,8 @@
              when (or ,c (not ,token-source-location)) return ,c)))
 
   (defmethod input-to-string ((tsrc token-source))
+    "Return a string representing all tokens that may be obtained from the
+     token source TSRC."
     (declare (special *root-context*))
     (loop for tok := (next-token/shift tsrc *root-context*)
 	  for str := (input-to-string tok)
@@ -864,6 +894,8 @@
                                      token-source)
                                state
                                &body body)
+    "Evaluate BODY in a lexical environment where values under keys are
+     bound to the corresponding members of the parser state STATE."
     (with-var-value (state)
       `(let (,@(and accumulator `((,accumulator (accumulator ,state))))
              ,@(and terminator `((,terminator (terminator ,state))))

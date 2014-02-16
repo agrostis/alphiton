@@ -1,6 +1,24 @@
+(in-package #:cl-user)
+
 (defpackage #:mex
   (:use #:cl #:ps #:cl-unicode)
-  (:export #:mex #:write-js))
+  (:export #:mex #:write-js
+           ;; Category tables
+           #:*category-table* #:char-cat #:cat-table-from-unicode-blocks
+           #:*default-category-table* #:*plain-category-table*
+           ;; Contexts
+           #:*capacity-exceeded* #:*default-locale* #:*root-context*
+           #:*prologue*
+           ;; Tokens and groups
+           #:tokens #:data-to-input
+           ;; DOM construction
+           #:make-dom-element #:element-name #:element-content
+           #:make-dom-attribute #:attribute-name #:attribute-value
+           #:make-dom-text #:text-content
+           #:make-dom-comment #:comment-content
+           #:make-dom-recipe #:recipe-handler-name #:recipe-data
+           #:*dom-root-wrapper* #:*dom-error-wrapper*
+           #:dom-to-json #:json-to-dom #:dom-equal #:dom-equal*))
 
 (defvar mex::%prologue% ""
   "Code to run at start of Mex processing.

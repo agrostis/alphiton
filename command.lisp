@@ -385,7 +385,7 @@
   (defun expansion-to-token-source (expansion parent-source context)
     "Convert a command expansion (vector of tokens and/or groups) into a
      token source such that NEXT-TOKEN and SOURCE-AFTER-NEXT-TOKEN
-     would traverse preserving the order."
+     would traverse the expansion in order from left to right."
     (let ((tokens (make-stack)))
       (labels ((push-tokens (input)
                  (loop for sub :across input
@@ -454,6 +454,7 @@
                                     (tokens :chars "}")))))
             token-source nil))))
 
+  #| TBD: recursion guards |#
 
   (defvar *unexpandable* '()
     "List of command and active tokens that should not expand,

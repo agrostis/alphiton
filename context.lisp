@@ -31,7 +31,7 @@
       `(let ,(append bindings bindings+)
          ,@body)))
 
-  (defmacro+ps defguard (name max)
+  (defmacro+ps defguard (name max &rest doc)
     "Define a capacity guard variable and a macro which performs some
      operation only after decreasing the capacity and checking that it has
      not been exceeded."
@@ -39,7 +39,7 @@
           (guardsym (intern (format nil "GUARDED-FOR-~A" name))))
       (pushnew capsym *capacity-guards*)
       `(progn
-         (defvar ,capsym ,max)
+         (defvar ,capsym ,max ,@doc)
          (defmacro ,guardsym (op &rest args)
            (let ((guard-name ',name) (capsym ',capsym))
              `(if (> (decf ,capsym) 0)
@@ -72,7 +72,9 @@
 
 (ambi-ps ()
 
-  (defguard context 100000)
+  (defguard context 100000
+    "Only so many contexts (incl. groups) allowed in a single processing
+     run.")
 
   (defstruct-guarded (context (:conc-name) (:guard context))
     "A Mex processing context, holding local customizations of character

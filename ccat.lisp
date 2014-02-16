@@ -1,6 +1,6 @@
 (in-package #:mex)
 
-;;; Categories
+;;; Character category tables
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -334,10 +334,13 @@
 
 (defvar *default-category-table*
   #.(cat-table-from-unicode-blocks "Basic Latin" "Cyrillic"
-                                   "Latin-1 Supplement"))
+                                   "Latin-1 Supplement")
+  "Category table with definitions from Unicode.")
 
 (defvar *plain-category-table*
-  #.(cat-table 0 (1- +code-point-limit+) *ccat-other*))
+  #.(cat-table 0 (1- +code-point-limit+) *ccat-other*)
+  "Category table where every character is categorized as non-active
+   non-costituent other.")
 
 (ambi-ps ()
 

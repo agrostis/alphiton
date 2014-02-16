@@ -52,7 +52,7 @@
 (defun write-js (js-file)
   (when (and *js-target* (not (equal *js-target* "")))
     (format *error-output*
-            "~%; writing generated JavaScript to ~S...~%"
+            "~&~%; writing generated JavaScript to ~S...~%"
             (enough-namestring js-file))
     (with-open-file (out js-file :direction :output :if-exists :supersede)
       (princ *js-target* out))))
@@ -103,9 +103,11 @@
 ;; Numbers
 
 (defun ensure-integer (str)
+  "Given a string STR, try to parse it as a decimal integer."
   (parse-integer str :junk-allowed t))
 
 (defpsfun ensure-integer (str)
+  "Given a string STR, try to parse it as a decimal integer."
   (let ((n (parse-int str)))
     (if (is-finite n) n nil)))
 
@@ -303,6 +305,8 @@
   ((@ (sliced vector 0) reverse)))
 
 (defpsmacro member (thing seq &key test)
+  "Return true iff THING is in SEQ.  If TEST is given, use it as the
+   comparison function."
   (if test
       (with-var-value (seq)
         (with-var-value (test)
@@ -342,8 +346,8 @@
                 (aref ,vector ,offset))))))
 
 (defun+ps vector-equal (a b test-fn)
-  "Return true if the vectors A and B have the same length and contain the
-   same elements (under EQ-FN) in the same order."
+  "Return true iff the vectors A and B have the same length and contain the
+   same elements (under TEST-FN) in the same order."
   (and (= (length a) (length b))
        (loop for elt-a :across a
              for elt-b :across b
@@ -736,7 +740,7 @@
           and collect arg))
 
 (defpsmacro defgeneric (name (obj &rest other-args) &rest methods-etc)
-  "Define a function named NAME which tries to invoke the corresponding
+  "Define a function named NAME which tries to apply the corresponding
    method of its first argument OBJ to OTHER-ARGS.  If OBJ is no object or
    has no such method, run the default code which may be specified as the
    method for OBJ of type T."

@@ -9,6 +9,7 @@
   ())
 
 (defmethod output-files ((op load-mex-prologue-op) component)
+  (declare (ignore component))
   (values nil nil))
 
 (defun slurp-file (mex-file)
@@ -28,6 +29,7 @@
       (set prologue-var (slurp-file mex-file)))))
 
 (defmethod operation-done-p ((op load-mex-prologue-op) component)
+  (declare (ignore component))
   nil)
 
 (defun write-js (js-file)

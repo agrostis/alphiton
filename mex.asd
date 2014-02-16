@@ -59,7 +59,8 @@
            (:file "group")
            (:file "command")
            (:file "core")
-           ;(:file "memory")
+           (:file "data")
+           (:file "dom")
            (:static-file "prologue.mex")
            (:file "mex"
               :in-order-to ((compile-op

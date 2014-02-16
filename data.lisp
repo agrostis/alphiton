@@ -293,6 +293,566 @@
           (cond ((true-p data) "true") ((false-p data) "false") (t data))
           context)))
 
+
+  ;;; Registers
+
+  (defun context-stack-push (value context)
+    "Dispose of datum VALUE by pushing it to DOM stack associated with
+     CONTEXT."
+    (with-context-dom-stack (stacks context)
+      (let ((current (current-stack stacks)))
+        (if (and (vectorp value) (token-p (aref* value 0)))
+            (loop for tok :across value do (stack-push tok current))
+            (stack-push value current)))))
+
+  (defvar *put-data-callback* nil
+    "A function to dispose of data objects obtained from input or in the
+     course of computation, or NIL the data should be pushed to DOM stack.")
+
+  (defun put-data (value context)
+    "Dispose of datum VALUE obtained from input or in the course of
+     computation."
+    (if *put-data-callback*
+        (funcall *put-data-callback* value context)
+        (context-stack-push value context)))
+
+  (defun add-register-commands (key command-table register-table)
+    "Add to COMMAND-TABLE two builtin commands to store and retrieve the
+     value under KEY in REGISTER-TABLE.  More precisely, if <RegToken> is
+     the command token corresponding to the given KEY, and <ValueTokens> is
+     some token sequence constituting a command that disposes of a value,
+     then bare <RegToken> shall be a command which somehow disposes of the
+     value stored under KEY, and <RegToken>=<ValueTokens> shall be a command
+     which stores under KEY the value disposed of by the command sequence
+     <ValueTokens>."
+    (let* ((getter
+            (lambda (match context ship)
+              (declare (ignore ship))
+;             (format *trace-output* "~&@@@ Getting from register ~A, passing to ~S~%"
+;                     key *put-data-callback*)
+              (put-data (lookup key register-table nil) context)
+              (parser-expansion-state (token-source-state match) t)))
+           (assign 
+             (tokens :chars "="))
+           (setter
+            (lambda (match context ship)
+              (let* ((tsrc (token-source-state match))
+                     (tok nil)
+                     (stored nil)
+                     (pstate (when (match-setf ((tok token*)) tsrc context)
+                               (let ((*put-data-callback*
+                                       (lambda (value context)
+                                         (declare (ignore context))
+;                                        (format *trace-output* "~&@@@ Setting register ~A to ~S~%"
+;                                                key value)
+                                         (setf stored t)
+                                         (remember key register-table
+                                                   value))))
+                                 (mex-dispatch tok tsrc context ship)))))
+                (if stored pstate
+                    (parser-error-state* tsrc
+                      "noData" (dispatching-token match) assign tok))))))
+      (add-command key
+        (make-builtin :pattern (vector) :handler getter)
+        command-table *adjoin-strong*)
+      (add-command key
+        (make-builtin
+          :pattern (vector (make-pattern-delimiter :tokens assign))
+          :handler setter)
+        command-table *adjoin-strong*)))
+
+  (defbuiltin register (cmd-tok
+                        :match match :context ctx :dispatching dispatching
+                        :token-source tsrc)
+    "Consume one command token, use it to obtain a command key, and create
+     two builtins, used to store and retrieve a data object under that key
+     from the register table of the native context of DISPATCHING (or its
+     nearest opaque ancestor).  Record the builtins in the command table of
+     the same context under the same key.  If the command token is followed
+     by a `=', expand to the command key (allowing for initialization usages
+     such as \\register\\foo=\\true).  Otherwise, expand to nothing."
+    :pattern
+    (match-setf-and-yield ((cmd-tok token #'command-token-p)) match ctx)
+    :handler
+    (let ((octx (ensure-opaque-context (token-context dispatching))))
+      (if octx
+          (bind/init ((cmd-table (command-table octx) (make-table))
+                      (reg-table (register-table octx) (make-table)))
+            (add-register-commands (token-command-key cmd-tok)
+                                   cmd-table reg-table)
+            (parser-expansion-state tsrc
+              (or (not (token-is (next-token* tsrc ctx) :char #\=))
+                  cmd-tok)))
+          (parser-error-state* tsrc
+            "noContextInput" dispatching cmd-tok))))
+
+
+  ;;; Data constructors
+
+  (defbuiltin true (:context ctx :token-source tsrc)
+    "Dispose of the boolean true as a data object.  Consume nothing, and
+     expand to nothing."
+    (put-data t ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin false (:context ctx :token-source tsrc)
+    "Dispose of the boolean false as a data object.  Consume nothing, and
+     expand to nothing."
+    (put-data false ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin token (tok :match match :context ctx :token-source tsrc)
+    "Consume one (non-eot) token, subject to parameter expansion, and
+     dispose of it as a data object.  Expand to nothing."
+    :pattern
+    (match-setf-and-yield ((tok token* #'non-eot-p)) match ctx)
+    :handler
+    (put-data tok ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin tokens (:match match :context ctx :token-source tsrc)
+    "Consume <Content>\\endtokens, where <Content> is any sequence of tokens
+     not containing paragraph breaks.  Expand parameters in <Content>, and
+     dispose of the sequence of tokens as a data object.  Expand to
+     nothing."
+    :pattern
+    (loop for tok := (next-token/expand (token-source-state match) ctx)
+          if (or (par-break-p tok) (eot-p tok))
+            return nil
+          else if (token-is tok :command "endtokens")
+            do (setf (accumulator match) (ensure-vector content)
+                     (terminator match) tok)
+               (incf (match-length match))
+               (incf (matched-token-count match))
+            and return match
+          else
+            collect tok :into content
+            and do (incf (match-length match)))
+    :handler
+    (put-data (accumulator match) ctx)
+    (parser-expansion-state tsrc t))
+
+  #| TBD: Correct handling of token sequences wrt. \pop etc. |#
+  #| TBD: Check all code for cases where a token is expected, but an error
+          display might sneak in. |#
+
+  (defun match-int (match context)
+    "Pattern matcher function for \\int etc.  Consume an integer
+     representation, i. e. zero or more character tokens of category `other'
+     followed by one or more character tokens of category `number', whose
+     string representation can be converted to an integer.  Update match
+     length and token source in MATCH, and store the integer value in the
+     accumulator."
+    (loop with tsrc := (token-source-state match)
+          for tsrc- = tsrc
+          for tok := (next-token/expand tsrc context)
+          for length :from 1
+          for cat := (and (char-token-p tok) (not (newline-token-p tok))
+                          (ccat-base (token-category tok)))
+          with some-digits := nil
+          while (or (and (eql cat *ccat-number*) (setf some-digits t))
+                    (unless some-digits (eql cat *ccat-other*)))
+          collect (token-chr tok) :into str
+          finally (let ((int (ensure-integer (ensure-string str))))
+                    (return
+                      (when (numberp int)
+                        (setf (match-length match) length
+                              (token-source-state match) tsrc-
+                              (accumulator match) int)
+                        match)))))
+
+  (defbuiltin int (:match match :context ctx :token-source tsrc)
+    "Consume an integer representation and dispose of the integer as data
+     object.  Expand to nothing."
+    :pattern
+    (match-int match ctx)
+    :handler
+    (put-data (accumulator match) ctx)
+    (parser-expansion-state tsrc t))
+
+
+  ;;; Token comparison
+
+  (defbuiltin is (tok1 tok2 :match match :context ctx :token-source tsrc)
+    "Consume two (non-eot) tokens, subject to parameter expansion, and
+     dispose of a boolean: true if the two tokens are the same (in the sense
+     of TOKEN-EQUAL), false otherwise.  Expand to nothing."
+    :pattern
+    (match-setf-and-yield ((tok1 token* #'non-eot-p)
+                           (tok2 token* #'non-eot-p))
+      match ctx)
+    :handler
+    (put-data (token-equal tok1 tok2) ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin iscommand (tok :match match :context ctx :token-source tsrc)
+    "Consume one (non-eot) token, subject to parameter expansion, and
+     dispose of a boolean: true if the token is a command token, false
+     otherwise.  Expand to nothing."
+    :pattern
+    (match-setf-and-yield ((tok token* #'non-eot-p)) match ctx)
+    :handler
+    (put-data (command-token-p tok) ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin ischr (tok :match match :context ctx :token-source tsrc)
+    "Consume one (non-eot) token, subject to parameter expansion, and
+     dispose of a boolean: true if the token is a character token, false
+     otherwise.  Expand to nothing."
+    :pattern
+    (match-setf-and-yield ((tok token* #'non-eot-p)) match ctx)
+    :handler
+    (put-data (char-token-p tok) ctx)
+    (parser-expansion-state tsrc t))
+
+  (defbuiltin hascat (query-cat compare-base tok
+                      :match match :context ctx :token-source tsrc)
+    "Consume some tokens that constitute a character category specification,
+     and one character token, subject to parameter expansion.  Dispose of a
+     boolean: true if the character matches the specified category, false
+     otherwise.  Expand to nothing."
+    (declare (ignorable query-cat compare-base))
+    :pattern
+    (and (setf match (match-ccat-spec match ctx))
+         (match-setf-and-yield ((tok token* #'char-token-p)) match ctx))
+    :handler
+    (let* ((arg-cat (token-category tok))
+           (value (and (or (not compare-base)
+                           (eql (ccat-base arg-cat)
+                                (ccat-base query-cat)))
+                       (or (not (ccat-constituent-p query-cat))
+                           (ccat-constituent-p arg-cat))
+                       (or (not (ccat-active-p query-cat))
+                           (ccat-active-p arg-cat)))))
+      (put-data value ctx)
+      (parser-expansion-state tsrc t)))
+
+
+  ;;; Operations on stacked arguments
+
+  (defmacro if-stack-pop-bind ((&rest bindings) context seq &optional alt)
+    "If data at the top of the DOM stack associated with CONTEXT matches
+     BINDINGS by count and type, run SEQ in an environment where variables
+     from BINDINGS are bound to the corresponding data objects.  If the data
+     in stack doesn't match, and ALT is provided, run it instead.  In any
+     case, data are popped off the stack prior to running SEQ or ALT.
+       BINDINGS consist of a number of data binding specs followed by
+     auxiliary bindings.  A data spec has the form (<VAR> <TYPE> [<PRED>]),
+     where <VAR> is a symbol (variable name), <TYPE> is one of the literal
+     symbols ANY, INT, BOOL, TOKEN, or ELEMENT, and <PRED> is an optional
+     specifier for a predicate function, quasi defaulting to (CONSTANTLY T).
+     A spec matches/binds a data object of the corresponding type, provided
+     that it satisfies <PRED>.  Specs which are closer to the beginning of
+     BINDINGS correspond to data deeper in the stack.
+       Auxiliary bindings make up a property list which may include
+     variable names indicated by the keywords :STACKS, :ELEMENTS, :CURRENT,
+     :UNDERFLOW, and :CONTEXT.  The variable indicated by :STACKS is bound
+     to the DOM multistack; the variable indicated by :ELEMENTS, to the
+     element stack of the multistack; the variable indicated by :CURRENT, to
+     the current stack; the variable indicated by :CONTEXT, to the CONTEXT
+     (this is useful in DEFBUILTIN-STACK-FUNOPs); the variable indicated
+     by :UNDERFLOW is bound to T if the stack doesn't have enough data to
+     match other bindings, and to NIL otherwise."
+    (let* ((aux-bindings (member-if #'keywordp bindings))
+           (data-bindings (ldiff bindings aux-bindings)))
+      (destructuring-bind (&key ((:stacks stacks-var) (ps-gensym "STACKS"))
+                                ((:current current-var) (ps-gensym "CUR"))
+                                ((:underflow underflow) (ps-gensym "UNDFL"))
+                                ((:elements elements-var) (ps-gensym "ELTS")
+                                 elements-var-p)
+                                ((:context context-var) nil
+                                 context-var-p)
+                           &aux (underflow-check (ps-gensym "UNDFLCK")))
+            aux-bindings
+        (multiple-value-bind (data-pops data-checks)
+            (loop for binding :in data-bindings
+                  with pop and check
+                  with pops and checks
+                  do (destructure/or binding
+                       ((var type &optional pred)
+                        (and (symbolp var)
+                             (let ((type-check
+                                    (case type
+                                      ((any) t)
+                                      ((int) `(integerp ,var))
+                                      ((bool) `(or (true-p ,var)
+                                                   (false-p ,var)))
+                                      ((token) `(token-p ,var))
+                                      ((element) `(dom-element-p ,var))
+                                      (t nil)))
+                                   (pred-check
+                                    (and pred `(funcall ,pred ,var))))
+                               (when type-check
+                                 (setf pop
+                                         `(,var (and (not ,underflow)
+                                                     (stack-pop
+                                                       ,current-var
+                                                       ,underflow-check)))
+                                       check
+                                         (if pred-check
+                                             (if (eq type-check t)
+                                                 pred-check
+                                                 `(and ,type-check
+                                                       ,pred-check))
+                                            type-check)))))))
+                   when pop
+                     do (push pop pops) (push check checks)
+                   else
+                     do (error "Invalid IF-STACK-POP-BIND binding: ~S"
+                               binding)
+                   finally (return (values pops checks)))
+          `(with-context-dom-stack (,stacks-var ,context
+                                    :current ,current-var
+                                    ,@(when elements-var-p
+                                        `((:elements ,elements-var))))
+             (let* ((,underflow nil)
+                    (,underflow-check (lambda () (setf ,underflow t)))
+                    ,@data-pops
+                    ,@(when context-var-p `((,context-var ,context))))
+               (declare (ignorable ,@(mapcar #'car data-pops)))
+               (if (and (not ,underflow) ,@data-checks) ,seq ,alt)))))))
+
+  (defun stack-op-error (dispatching underflow &rest args)
+    "Return an error display for one of the two errors common to all stack
+     operations: a stack underflow (e. g., a POP called with an empty stack)
+     or an invalid argument (e. g., a DIV called on a non-integer or zero
+     divider)."
+    (declare (special *root-context*))
+    (if underflow
+        (error-display* "stackUnderflow" dispatching)
+        (loop
+          for arg :in args
+          for arg-input
+            := (cond
+                 ((error-display-p arg)
+                  (tokens :chars (string #.(code-char #x2191))))
+                 ((or (token-p arg) (group-p arg))
+                  (vector-add
+                   (tokens :chars (string #.(code-char #xAB)))
+                   (string-to-input (input-to-string arg)
+                     *root-context* *plain-category-table*)
+                   (tokens :chars (string #.(code-char #xBB)))))
+                 (t (data-to-input* arg *root-context*)))
+          for args-input := arg-input
+            :then (vector-add args-input (tokens :chars " ") arg-input)
+          for error := nil
+            :then (if (error-display-p arg)
+                      (error-display* :add-to error :append arg
+                                      :sep ellipsis)
+                      error)
+          finally
+            (return
+              (error-display-add error
+                :append-input dispatching :sep ellipsis
+                :append-message
+                  (vector-add
+                    (tokens :command "stackOpInvalidArgs" :chars "{")
+                    args-input
+                    (tokens :chars "}")))))))
+
+  (defbuiltin discard (:match match :context ctx :dispatching dispatching
+                       :token-source tsrc)
+    "Pop and discard one element off the stack.  Expand to nothing."
+    (if-stack-pop-bind ((x any)) ctx
+      (parser-expansion-state tsrc t)
+      (parser-error-state tsrc (stack-op-error dispatching t))))
+
+  (defbuiltin pop (:match match :context ctx :dispatching dispatching
+                   :token-source tsrc)
+    "Pop one element off the stack.  If disposing of the datum would not
+     push it back on the stack (e. g., if it would be put into a register,
+     or used to check a condition), do so and expand to nothing.  Otherwise,
+     convert the datum to input and use that as expansion."
+    (if-stack-pop-bind ((x any)) ctx
+      (if *put-data-callback*
+          (progn (funcall *put-data-callback* x ctx)
+                 (parser-expansion-state tsrc t))
+          (parser-expansion-state tsrc (data-to-input* x ctx)))
+      (parser-error-state tsrc (stack-op-error dispatching t))))
+
+  (defbuiltin bottom (:match match :context ctx :dispatching dispatching
+                      :token-source tsrc)
+    "Dispose of boolean true if the stack is empty, of false otherwise.
+     Expand to nothing."
+    (with-context-dom-stack (s ctx :current current)
+      (put-data (stack-empty-p current) ctx)
+      (parser-expansion-state tsrc t)))
+
+  (defbuiltin dup (:match match :context ctx :dispatching dispatching
+                   :token-source tsrc)
+    "Duplicate the top element of the stack.  Expand to nothing."
+    (if-stack-pop-bind ((x any) :current current) ctx
+      (progn (stack-push x current) (stack-push x current)
+             (parser-expansion-state tsrc t))
+      (parser-error-state tsrc (stack-op-error dispatching t))))
+
+  (defbuiltin exch (:match match :context ctx :dispatching dispatching
+                    :token-source tsrc)
+    "Exchange the two top elements of the stack.  Expand to nothing."
+    (if-stack-pop-bind ((x any) (y any) :current current) ctx
+      (progn (stack-push y current) (stack-push x current)
+             (parser-expansion-state tsrc t))
+      (parser-error-state tsrc (stack-op-error dispatching t))))
+
+  (defbuiltin roll (:match match :context ctx :dispatching dispatching
+                    :token-source tsrc)
+    "Pop a non-negative integer N and an integer P off the stack, which
+     should then contain at least N elements.  Rotate by P positions the top
+     N elements of the stack (see STACK-ROTATE).  Expand to nothing."
+    (if-stack-pop-bind ((scope int (lambda (x) (>= x 0))) (value int)
+                        :current current :underflow underflow)
+        ctx
+      (progn
+        (stack-rotate current scope value (lambda () (setf underflow t)))
+        (if underflow
+            (parser-error-state tsrc (stack-op-error dispatching t))
+            (parser-expansion-state tsrc t)))
+      (parser-error-state tsrc
+        (stack-op-error dispatching underflow scope value))))
+
+  (defmacro defbuiltin-stack-funop (name operands expr)
+    "Define a builtin NAME which pops as many elements of specified types
+     off the stack as there are OPERANDS, computes a function of them (given
+     by EXPR), and disposes of the value."
+    (with-ps-gensyms (match dispatching context tsrc underflow)
+      `(defbuiltin ,name (:match ,match :context ,context
+                          :dispatching ,dispatching :token-source ,tsrc)
+         (if-stack-pop-bind (,@operands :underflow ,underflow) ,context
+           (progn (put-data ,expr ,context)
+                  (parser-expansion-state ,tsrc t))
+           (parser-error-state ,tsrc
+             (stack-op-error ,dispatching ,underflow
+                             ,@(loop for op :in operands
+                                     until (keywordp op)
+                                     collect (car op))))))))
+
+  ;; Type checking
+
+  (defbuiltin-stack-funop haveint ((x any))
+    (integerp x))
+
+  (defbuiltin-stack-funop havebool ((x any))
+    (or (true-p x) (false-p x)))
+
+  (defbuiltin-stack-funop havetokens ((x any))
+    (and (vectorp x)
+         (or (= (length x) 0) (token-p (aref x 0)))))
+
+  (defbuiltin-stack-funop haveerror ((x any))
+    (error-display-p x))
+
+  (defbuiltin-stack-funop haveelement ((x any))
+    (dom-element-p x))
+
+  (defbuiltin-stack-funop havecomment ((x any))
+    (dom-comment-p x))
+
+  (defbuiltin-stack-funop haverecipe ((x any))
+    (dom-recipe-p x))
+
+  ;; Arithmetic ops
+
+  (defbuiltin-stack-funop add ((x int) (y int))
+    (+ x y))
+
+  (defbuiltin-stack-funop sub ((x int) (y int))
+    (- x y))
+
+  (defbuiltin-stack-funop mul ((x int) (y int))
+    (* x y))
+
+  (defbuiltin-stack-funop div ((x int) (y int (lambda (y) (/= y 0))))
+    (truncate x y))
+
+  (defbuiltin-stack-funop rem ((x int) (y int (lambda (y) (/= y 0))))
+    (rem x y))
+
+  (defbuiltin-stack-funop gt ((x int) (y int))
+    (> x y))
+
+  (defbuiltin-stack-funop geq ((x int) (y int))
+    (>= x y))
+
+  (defbuiltin-stack-funop lt ((x int) (y int))
+    (< x y))
+
+  (defbuiltin-stack-funop leq ((x int) (y int))
+    (<= x y))
+
+  ;; Logic ops
+
+  (defbuiltin-stack-funop conj ((x bool) (y bool))
+    (and x y))
+
+  (defbuiltin-stack-funop disj ((x bool) (y bool))
+    (or x y))
+
+  (defbuiltin-stack-funop neg ((x bool))
+    (not x))
+
+  (defbuiltin-stack-funop eq ((x any) (y any))
+    (or (eq x y)
+        (and (numberp x) (numberp y) (= x y))
+        (and (false-p x) (false-p y))
+        (token-equal x y)))
+
+  ;; Char ops
+
+  (defbuiltin-stack-funop charint ((x token #'char-token-p))
+    (char-code (token-chr x)))
+
+  (defbuiltin-stack-funop intchar ((x int
+                                    (lambda (x)
+                                      (<= #.(min-char *category-table*)
+                                          x
+                                          #.(max-char *category-table*))))
+                                   :context ctx)
+    (guarded-make-char-token :start 0 :end 1 :context ctx
+                             :chr (code-char x)
+                             :category (char-cat x (category-table ctx))))
+
+  (defbuiltin-stack-funop upcase ((x token #'char-token-p))
+    (let ((ux (copy-structure x)))
+      (setf (token-chr ux) (upcase (token-chr x)))
+      ux))
+
+  (defbuiltin-stack-funop downcase ((x token #'char-token-p))
+    (let ((ux (copy-structure x)))
+      (setf (token-chr ux) (downcase (token-chr x)))
+      ux))
+
+  ;; DOM ops
+
+  (defbuiltin open (elt-name
+                    :match match :context ctx :dispatching dispatching
+                    :token-source tsrc)
+    :pattern
+    (match-setf-and-yield ((elt-name group #'group-p)) match ctx)
+    :handler
+    (parser-state-bind (:accumulator elt-name-expn :error expn-errors)
+        (get-full-expansion elt-name tsrc ctx)
+      (if expn-errors
+          (parser-error-state tsrc
+            (error-display* :add-to expn-errors :prepend-input dispatching
+                            :sep ellipsis))
+          (with-context-dom-stack (stacks ctx)
+            (dom-stack-open-element
+              (element (input-to-string elt-name-expn))
+              stacks)
+            (parser-expansion-state tsrc t)))))
+
+  (defbuiltin close (:match match :context ctx)
+    :pattern
+    (when (match-setf-update ((:command "current")) match ctx)
+      match)
+    :handler
+    (with-context-dom-stack (stacks ctx)
+      (dom-stack-close-element stacks))
+    (parser-expansion-state (token-source-state match) t))
+
+  #| TBD: \close{<Elt>}, \close\block, etc.
+     TBD: DOM lookup + \reopen |#
+
 )
 
 ;;; Local Variables: ***

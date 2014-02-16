@@ -560,11 +560,12 @@
     (:documentation "Return the string representation of an input element.")
     (:method (input)
       (if (vectorp input)
-	  (loop for part :across input
-	        for str := (input-to-string part)
-                  :then (concatenate 'string str (input-to-string part))
+          (loop
+            for part :across input
+            for str := (input-to-string part)
+                    :then (concatenate 'string str (input-to-string part))
 	        finally (return str))
-	  ""))
+          ""))
     (:method ((token char-token))
       (string (token-chr token)))
     (:method ((token newline-token))
@@ -579,16 +580,16 @@
       (let ((arg-str (input-to-string (token-arg-token token))))
         (interpolate "#(token-param-escape-chr token)#{arg-str}"))))
 
-(defun string-to-input (string context
-                        &optional (table (category-table context)))
-  "Convert STRING to a sequence of character tokens with the given
-   native context."
-  (loop for i :from 0 :below (length string)
-        for c := (char-at string i)
-        collect (make-char-token :start i :end (1+ i) :context context
-                                 :chr c :category (char-cat c table))
-          :into tokens
-        finally (return (ensure-vector tokens))))
+  (defun string-to-input (string context
+                          &optional (table (category-table context)))
+    "Convert STRING to a sequence of character tokens with the given
+     native context."
+    (loop for i :from 0 :below (length string)
+          for c := (char-at string i)
+          collect (make-char-token :start i :end (1+ i) :context context
+                                   :chr c :category (char-cat c table))
+            :into tokens
+          finally (return (ensure-vector tokens))))
 
   (defgeneric data-to-input (thing context)
     (:documentation "Convert arbitrary datum to input elements (tokens,
@@ -903,7 +904,6 @@
              ,@(and error `((,error (parser-error ,state))))
              ,@(and token-source `((,token-source
                                     (token-source-state ,state)))))
-             
          ,@body)))
 
 )

@@ -362,7 +362,8 @@
      true iff the parser state indeed resulted from an expansion (as opposed
      to just peeking a non-expandable token)."
     (if (eq expansion t)
-        (make-parser-state :token-source-state token-source :parser-value t)
+        (make-parser-state :token-source-state token-source
+                           :parser-value t)
         (make-parser-state :token-source-state token-source
                            :accumulator expansion
                            :parser-value (and expansion t))))

@@ -4,8 +4,6 @@
 
 (ambi-ps ()
 
-  ;; 
-
   (defstruct-guarded (group (:include opaque-context) (:guard context))
     "A sequence of tokens delimited by braces, which also constitutes a
      context with its own category, command and alias tables, effective
@@ -17,9 +15,6 @@
 
   (defmethod input-end ((grp group))
     (group-end grp))
-
-  (defmethod input-to-string ((ed error-display))
-    nil)
 
   (defmethod input-to-string ((grp group))
     (loop for sub :across (group-contents grp)

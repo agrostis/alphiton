@@ -105,14 +105,6 @@
     "May be temporarily set to true to allow the modification of contexts
      which otherwise are transparent (i. e. not opaque).")
 
-  (defun ensure-opaque-context (context)
-    "Return the CONTEXT or its nearest parent which is opaque."
-    (if *no-transparent-contexts*
-        context
-        (loop for ctx := context :then (parent-context ctx)
-              until (or (not ctx) (opaque-context-p ctx))
-              finally (return ctx))))
-
   (defmacro spawn-context (&rest args)
     (let (context constructor slot-init-args)
       (destructure/or args
@@ -139,6 +131,14 @@
                             :parent-context context)
                   do (setf (getf slot-init kw) val)
                   finally (return slot-init))))))
+
+  (defun ensure-opaque-context (context)
+    "Return the CONTEXT or its nearest parent which is opaque."
+    (if *no-transparent-contexts*
+        context
+        (loop for ctx := context :then (parent-context ctx)
+              until (or (not ctx) (opaque-context-p ctx))
+              finally (return ctx))))
 
   (defun set-context-locale (context locale-id)
     "Set the current locale (localized command table) in CONTEXT and in

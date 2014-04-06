@@ -653,7 +653,7 @@
   (let (name super conc)
     (if (symbolp name-and-options)
         (setf name name-and-options
-              conc (format nil "~A-" name-and-options))
+              conc (format nil "~A-" name))
         (loop initially (setf name (car name-and-options)
                               conc (format nil "~A-" name))
               for option :in (cdr name-and-options)

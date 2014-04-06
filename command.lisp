@@ -877,9 +877,22 @@
                           `(and ,@(mapcar #'make-setf quantified))))
                     (cond
                       ((eq quantifier '?)
-                       `(let (,@tmp-vars)
-                          (or (progn ,save-to-tmp ,match-quantified)
-                              (progn ,restore-from-tmp t))))
+                       (loop
+                         for qvar :in (match-pattern-vars quantified)
+                         for tmp-qvar := (ps-gensym (symbol-name qvar))
+                         collect tmp-qvar :into tmp-qvars
+                         collect `(setf ,tmp-qvar ,qvar)
+                           :into save-to-tmp-qvars
+                         collect `(setf ,qvar ,tmp-qvar)
+                           :into restore-from-tmp-qvars
+                         finally (return
+                                   `(let (,@tmp-vars ,@tmp-qvars)
+                                      (or (progn ,save-to-tmp
+                                                 ,@save-to-tmp-qvars
+                                                 ,match-quantified)
+                                          (progn ,restore-from-tmp
+                                                 ,@restore-from-tmp-qvars
+                                                 t))))))
                       ((eq quantifier '*)
                        (let* ((quantified-vars
                                (match-pattern-vars quantified))

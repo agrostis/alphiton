@@ -24,7 +24,7 @@
       (and (dom-text-p a) (dom-text-p b)
            (equal (text-content a) (text-content b)))
       (and (dom-comment-p a) (dom-comment-p b)
-           (dom-equal* (comment-content a) (comment-content-p b)))
+           (dom-equal* (comment-content a) (comment-content b)))
       (and (dom-recipe-p a) (dom-recipe-p b)
            (equal (recipe-handler-name a) (recipe-handler-name b))
            (dom-equal* (recipe-data a) (recipe-data b)))

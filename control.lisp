@@ -6,34 +6,37 @@
 
   ;; Conditional expansion
 
-  (defun match-conditional-check-errors (branches)
+  (defun match-conditional-check-errors (semibranches)
     "Check material collected by MATCH-CONDITIONAL for common syntax errors.
      Return an error display, or null, if the syntax is correct."
     (let ((errors nil)
           (ellip (tokens :chars "...")))
       (flet ((add-error (ed sep)
-               (setf errors
-                     (if errors
-                         (if sep
-                             (error-display*
-                               :add-to errors :append-input sep :append ed)
-                             (error-display*
-                               :add-to errors :append ed))
-                         ed))))
-        (loop for branch :across branches
-              for head := (aref branch 0)
-              with sep := nil
+               (setf errors (error-display*
+                              :add-to errors :sep sep :append ed))))
+        (loop for semibranch :across semibranches
+              for head := (aref semibranch 0)
+              for expect-condition := t :then (not expect-condition)
               with past-else := nil
+              with sep := nil
               if past-else
                 do (add-error
-                     (error-display* "extraConditionalBranch" branch)
+                     (error-display* "extraConditionalBranch" semibranch)
+                     sep)
+                   (setf sep nil)
+              else if (eq expect-condition
+                          (token-is head :command "then"))
+                do (add-error
+                     (if expect-condition
+                         (error-display* "missingCondition" semibranch)
+                         (error-display* "missingConditionalBody" semibranch))
                      sep)
                    (setf sep nil)
               else if (token-is head :command "else")
                 do (setf past-else t sep ellip)
-              else if (= (length branch) 1)
+              else if (and expect-condition (< (length semibranch) 2))
                 do (add-error
-                     (error-display* "emptyConditionalBranch" head)
+                     (error-display* "emptyCondition" semibranch)
                      sep)
                    (setf sep nil)
               else
@@ -42,11 +45,13 @@
 
   (defun match-conditional (match context)
     "Consume input without expansion, collecting conditional branches.
-     Return MATCH with its accumulator set to hold the vector of branches."
+     Return MATCH with its accumulator set to hold the vector of
+     semibranches (runs of tokens beginning with \\if, \\elsif, \\then, or
+     \\else)."
     (loop
       for input := (next-token/shift (token-source-state match) context)
       with nest-level := 0
-      with current-branch := (stack (dispatching-token match))
+      with current-semibranch := (stack (dispatching-token match))
       if (eot-p input)
         return nil
       else
@@ -58,77 +63,75 @@
         do (decf nest-level)
            (incf (matched-token-count match))
       when (< nest-level 0)
-        collect (ensure-vector current-branch) :into branches
-        and return (let ((branches (ensure-vector branches)))
+        collect (ensure-vector current-semibranch) :into semibranches
+        and return (let ((semibranches (ensure-vector semibranches)))
                      (setf (parser-error match)
-                             (match-conditional-check-errors branches)
+                             (match-conditional-check-errors semibranches)
                            (accumulator match)
-                             branches)
+                             semibranches)
                      match)
       if (and (= nest-level 0)
               (or (token-is input :command "elsif")
-                  (token-is input :command "else")))
-        collect (ensure-vector current-branch) :into branches
-        and do (setf current-branch (stack input))
+                  (token-is input :command "else")
+                  (token-is input :command "then")))
+        collect (ensure-vector current-semibranch) :into semibranches
+        and do (setf current-semibranch (stack input))
                (incf (matched-token-count match))
       else
-        do (stack-push input current-branch)))
+        do (stack-push input current-semibranch)))
 
-  (defun try-conditional-branch (branch context token-source)
-    "If BRANCH starts with \\else, unconditionally return all tokens after
-     \\else.  Otherwise, consume one dispatching token in BRANCH after \\if
-     or \\elsif, subject to parameter expansion.  Expand the command, which
-     must result in a data object being disposed of, and may consume more
-     tokens from the branch.  If the command expands correctly and disposes
-     of generalized boolean truth, return the unconsumed part of the branch.
-     Otherwise, return null (or an error display)."
-    (let ((branch-head (aref branch 0))
-          (branch-sans-head (spliced branch 0 1)))
-      (if (token-is branch-head :command "else")
-          branch-sans-head
-          (let ((tsrc (expansion-to-token-source
-                        branch-sans-head nil
-                        (or (expansion-context token-source)
-                            context))))
-            (if-match-bind ((cmd-tok token* #'dispatching-token-p))
-                tsrc context
-              (let* ((got-condition nil)
-                     (condition-value nil)
-                     (*verify-group-balance* t)
-                     (*put-data-callback*
-                      (lambda (value ctx)
-                        (declare (ignore ctx))
-                        (setf got-condition t condition-value value))))
-                (parser-state-bind (:token-source tsrc+)
-                    (mex-dispatch cmd-tok tsrc context nil)
-                  (cond
-                    ((not got-condition)
-                     (error-display* "noData" branch))
-                    (condition-value
-                     (loop for tok := (next-token/shift tsrc+ context t)
-                           until (eot-p tok)
-                           collect tok :into expn
-                           finally (return (ensure-vector expn))))
-                    (t nil))))
-              (error-display* "noData" branch))))))
+  (defun try-conditional-branch (condition body context token-source)
+    "If CONDITION is null (which is the case for an \\else branch), return
+     the tokens of BODY except the initial \\else.  Otherwise, expand tokens
+     in CONDITION after \\if or \\elsif, which should cause at least one
+     data object to be pushed to the stack.  If the last object disposed
+     of (the “condition value”) is generalized boolean truth, return the
+     tokens of BODY except the initial \\then.  Otherwise, return NULL.  In
+     either case, pop the condition value off the stack."
+    (let ((got-condition nil)
+          (condition-value t))
+      (if condition
+          (let ((*put-data-callback*
+                 (lambda (value ctx)
+                   (setf got-condition t condition-value value)
+                   (context-stack-push value ctx))))
+            (parser-state-bind (:error errors)
+                (get-full-expansion (spliced condition 0 1) token-source
+                                    context t)
+              (with-context-dom-stack (stacks context :current current)
+                (when (and got-condition
+                           (not (stack-empty-p current))
+                           (eq (stack-peek current) condition-value))
+                  (stack-pop current)))
+              (cond
+                (errors)
+                ((not got-condition) (error-display* "noData" condition))
+                (t (and (not (false-p condition-value))
+                        (spliced body 0 1))))))
+          (spliced body 0 1))))
 
   (defbuiltin if (:match match :context ctx)
     "Consume a conditional expression, consisting of ``branches'' delimited
-     by properly balanced \\if...[\\elsif...\\else...]\\endif tokens.
-     Find the first \\if... or \\elsif... branch whose initial tokens form a
-     command (``condition'') that disposes of a non-false datum, and expand
-     to the rest of the branch.  If all conditions dispose of false, but
-     there is an \\else... branch, expand to that branch (sans \\else).
-     Otherwise, expand to nothing."
+     by properly balanced \\if<CONDITION>\\then<BODY>[\\elsif<CONDITION>
+     \\then<BODY>...\\else<BODY>]\\endif, where <CONDITION> and <BODY> are
+     token runs. Find the first \\if... or \\elsif... branch whose
+     <CONDITION> includes a command that disposes of a non-false datum, and
+     expand to the corresponding <BODY>.  If all conditions dispose of
+     false, but there is an \\else... branch, expand to the <BODY> that
+     follows \\else.  Otherwise, expand to nothing."
     :pattern
     (match-conditional match ctx)
     :handler
     (if (parser-error match)
         match
-        (parser-state-bind (:accumulator branches :token-source tsrc)
+        (parser-state-bind (:accumulator semibranches :token-source tsrc)
             match
-          (loop for branch :across branches
-                for expn := (try-conditional-branch branch ctx tsrc)
+          (loop for i := 0 :then (+ i 2)
+                with len := (length semibranches)
+                while (< i len)
+                for condition := (and (< (1+ i) len) (aref semibranches i))
+                for body :=  (aref semibranches (if condition (1+ i) i))
+                for expn := (try-conditional-branch condition body ctx tsrc)
                 when expn
                   return (if (error-display-p expn)
                              (parser-error-state tsrc expn)

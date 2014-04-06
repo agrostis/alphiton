@@ -544,15 +544,15 @@
 @MEX
 \edef\foo{\backslash foo}
 \edef\bar{\backslash bar}
-\def\test#\TOKi#\TOKii{#\TOKi\if\is#\TOKi#\TOKii=\else≠\endif#\TOKii}
+\def\test#\TOKi#\TOKii{#\TOKi\if\is#\TOKi#\TOKii\then=\else≠\endif#\TOKii}
 \test\foo\foo; \test\foo\bar; \test12; \test22; \expandafter\test\chr\other11
-\def\testcat#\TOK{<#\TOK> is \if\iscommand#\TOK\
-  a command\elsif\ischr#\TOK\if\hascat\letter#\TOK\
-  a letter\elsif\hascat\number#\TOK\
-  a number digit\elsif\hascat\whitespace#\TOK\
+\def\testcat#\TOK{<#\TOK> is \if\iscommand#\TOK\then\
+  a command\elsif\ischr#\TOK\then\if\hascat\letter#\TOK\then\
+  a letter\elsif\hascat\number#\TOK\then\
+  a number digit\elsif\hascat\whitespace#\TOK\then\
   a whitespace\else\
   a special character\endif\
-  \if\hascat+\constituent#\TOK{} (constituent)\endif\endif}
+  \if\hascat+\constituent#\TOK\then{ }(constituent)\endif\endif}
 \testcat{\foo}; \testcat{7}; \testcat{Ω}; \testcat{美};
 \testcat{☺}; \testcat{ }; \testcat{ }
 @JSON

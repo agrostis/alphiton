@@ -19,7 +19,7 @@
 \comment -- English error messages
 
 \newlang{en_US}
-\lcdef\errmsg\emtyConditionalBranch{Empty branch in conditional}
+\lcdef\errmsg\emptyCondition{Empty condition}
 \lcdef\errmsg\eotInCommandToken{EOT occurred while parsing command token}
 \lcdef\errmsg\eotInGroup{EOT occurred inside a group}
 \lcdef\errmsg\eotInParamToken{EOT occurred while parsing parameter token}
@@ -31,6 +31,10 @@
 \lcdef\errmsg\hangingRbrace{Hanging right brace}
 \lcdef\errmsg\invalidLocale{Invalid locale id}
 \lcdef\errmsg\invalidStep{Invalid iteration step value}
+\lcdef\errmsg\missingCondition{Missing \backslash elsif... \
+               or \backslash else... in conditional}
+\lcdef\errmsg\missingConditionalBody{Missing \backslash then... \
+               in conditional}
 \lcdef\errmsg\noContextInput{Input has no associated context}
 \lcdef\errmsg\noData{No data received for register initializer, condition,\
                or in a similar context}

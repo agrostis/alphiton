@@ -900,7 +900,7 @@ ABCDE\exch\dup \int5\int-3\roll \int4\int2\roll 42\roll\exch
     (match-setf-and-yield ((elt-name group #'group-p)) match ctx)
     :handler
     (parser-state-bind (:accumulator elt-name-expn :error expn-errors)
-        (get-full-expansion elt-name tsrc ctx)
+        (get-full-expansion elt-name tsrc ctx t)
       (if expn-errors
           (parser-error-state tsrc
             (error-display* :add-to expn-errors :prepend-input dispatching

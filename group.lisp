@@ -147,8 +147,7 @@
      the parsing, joined together."
     (let ((tokens (make-stack))
           (errors nil)
-          (*group-end-p* #'eot-p)
-          (*verify-group-balance* nil))
+          (*group-end-p* #'eot-p))
       (parser-state-bind (:token-source tsrc+)
           (get-group-contents token-source context t
             (lambda (sub ctx)

@@ -583,11 +583,12 @@
             (make-parser-state
               :token-source-state expn-tsrc :parser-value t)))))
 
-  (defun get-full-expansion (input token-source context)
+  (defun get-full-expansion (input token-source context verify-balance)
     (let* ((ectx (and token-source (expansion-context token-source)))
            (tsrc+ (expansion-to-token-source
                     (if (group-p input) (group-contents input) input)
-                    nil ectx)))
+                    nil ectx))
+           (*verify-group-balance* verify-balance))
       (get-group-tokens tsrc+ context)))
  
   (defun simulate-command-with-input (name token-source context

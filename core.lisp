@@ -214,7 +214,7 @@
     :handler
     (let* ((content (accumulator match))
            (tsrc (token-source-state match))
-           (expansion-pstate (get-full-expansion content tsrc ctx)))
+           (expansion-pstate (get-full-expansion content tsrc ctx nil)))
       (if (parser-error expansion-pstate)
           (parser-error-state* tsrc
             :add-to (parser-error expansion-pstate)
@@ -386,7 +386,7 @@
                 (parser-state-bind (:accumulator expn :error expn-errors)
                     (let ((*unexpandable-params*
                            (append params *unexpandable-params*)))
-                      (get-full-expansion content tsrc ctx))
+                      (get-full-expansion content tsrc ctx t))
                   (if expn-errors
                       (parser-error-state* tsrc
                         :add-to expn-errors
@@ -442,7 +442,7 @@
         (let ((octx (ensure-opaque-context (token-context dispatching))))
           (if octx
               (parser-state-bind (:accumulator expn :error expn-errors)
-                  (get-full-expansion content tsrc ctx)
+                  (get-full-expansion content tsrc ctx nil)
                 (if expn-errors
                     (parser-error-state* tsrc
                       :add-to expn-errors
@@ -492,7 +492,7 @@
       (if (parser-error match)
           (errors-in-error (parser-error match))
           (parser-state-bind (:accumulator msg :error expn-errors)
-              (get-full-expansion message tsrc ctx)
+              (get-full-expansion message tsrc ctx nil)
             (if (or expn-errors (not (setf msg (input-to-string msg))))
                 (errors-in-error expn-errors)
                 (parser-error-state tsrc

@@ -2,6 +2,17 @@
 
 (in-suite mex-tests)
 
+(defmacro rand-string-test (name &body body)
+  `(test ,name
+     (macrolet ((trap-errors ((&rest plist) &rest forms)
+                  (let ((name ',name))
+                    `(multiple-value-bind (ret exc) (ignore-errors ,@forms)
+                       (setf (get ',name :exception) exc)
+                       ,@(loop for (i var) on plist by #'cddr
+                               collect `(setf (get ',name ,i) ,var))
+                       ret))))
+       ,@body)))
+
 (defun rand-string (length &optional make-substring)
   "Return a string of random characters.  The range of characters is between
    0 and 255, which is subdivided into four subranges of equal width.  The
@@ -17,9 +28,10 @@
                (r (+ (random 64) (* (random 64) (- 3 rh)))))
           (funcall putc (code-char r)))))))
 
-(test char-noise-robustness
+(rand-string-test char-noise-robustness
   ;; Processing 10KB random data should cause no Lisp errors.
-  (is-true (ignore-errors (mex (rand-string 10240)) t)))
+  (is-true (let ((noise (rand-string 10240)))
+             (trap-errors (:rand-string noise) (mex noise) t))))
 
 (defun rand-category-table ()
   (let ((base-cats (list mex::*ccat-invalid* mex::*ccat-whitespace*
@@ -38,12 +50,15 @@
             :then (char-cat i ctab rcat)
           finally (return ctab))))
 
-(test char-noise-robustness-with-random-ccats
+(rand-string-test char-noise-robustness-with-random-ccats
   ;; Same as CHAR-NOISE-ROBUSTNESS, but with character categories set at
   ;; random.
-  (let ((*root-context* (mex::spawn-context *root-context*
-                          :category-table (rand-category-table))))
-    (is-true (ignore-errors (mex (rand-string 10240)) t))))
+  (let ((rct (rand-category-table))
+        (noise (rand-string 10240)))
+    (let ((*root-context* (mex::spawn-context *root-context*
+                            :category-table rct)))
+      (is-true (trap-errors (:rand-string noise :rand-ccat rct)
+                 (mex noise) t)))))
 
 (let ((standard-command-tokens nil))
   (defun rand-standard-command-token ()

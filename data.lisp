@@ -405,7 +405,7 @@
     "Consume one (non-eot) token, subject to parameter expansion, and
      dispose of it as a data object.  Expand to nothing."
     :pattern
-    (match-setf-and-yield ((tok token* #'non-eot-p)) match ctx)
+    (match-setf-and-yield ((tok token* #'non-eot-token-p)) match ctx)
     :handler
     (put-data tok ctx)
     (parser-expansion-state tsrc t))

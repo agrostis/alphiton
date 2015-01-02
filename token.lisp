@@ -319,6 +319,11 @@
     "Return true iff THING does not signify an end of text."
     (not (eot-p thing)))
 
+  (defun non-eot-token-p (thing)
+    "Return true iff THING does not signify an end of text and is also not
+     an error display."
+    (and (token-p thing) (not (eot-token-p thing))))
+
   (defgeneric par-break-p (thing)
     (:documentation "Return true iff THING signifies a paragraph break.")
     (:method (thing) (declare (ignore thing)) nil)

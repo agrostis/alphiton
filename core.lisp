@@ -80,7 +80,7 @@
     "Consume one token.  Expand to a token which is just like the consumed
      but whose native context is the global (top-level) context."
     :pattern
-    (match-setf-and-yield ((tok token #'non-eot-p)) match ctx)
+    (match-setf-and-yield ((tok token #'non-eot-token-p)) match ctx)
     :handler 
     (let ((global-ctx
            (loop for octx := (ensure-opaque-context ctx)
@@ -96,7 +96,7 @@
     "Consume one token.  Expand to a token which is just like the consumed
      but whose native context is the local context (group or top-level)."
     :pattern
-    (match-setf-and-yield ((tok token #'non-eot-p)) match ctx)
+    (match-setf-and-yield ((tok token #'non-eot-token-p)) match ctx)
     :handler
     (replace-context tok ctx match))
 
@@ -106,7 +106,7 @@
      of its nearest opaque ancestor."
     #| TBD: \parent\parent... |#
     :pattern
-    (match-setf-and-yield ((tok token #'non-eot-p)) match ctx)
+    (match-setf-and-yield ((tok token #'non-eot-token-p)) match ctx)
     :handler
     (let ((parent-ctx
            (let ((octx (ensure-opaque-context ctx)))
@@ -489,18 +489,23 @@
                :add-to ed
                :prepend-message "errorsInError"
                :prepend-input dispatching faulty-input message)))
-      (if (parser-error match)
-          (errors-in-error (parser-error match))
-          (parser-state-bind (:accumulator msg :error expn-errors)
-              (get-full-expansion message tsrc ctx nil)
-            (if (or expn-errors (not (setf msg (input-to-string msg))))
-                (errors-in-error expn-errors)
-                (parser-error-state tsrc
-                  (make-error-display
-                    :faulty-input (if (group-p faulty-input)
-                                      (group-contents faulty-input)
-                                      (ensure-vector faulty-input))
-                    :message (vector msg))))))))
+      (cond
+        ((parser-error match)
+         (errors-in-error (parser-error match)))
+        ((error-display-p faulty-input)
+         (errors-in-error faulty-input))
+        ((error-display-p message)
+         (errors-in-error message))
+        (t (parser-state-bind (:accumulator msg :error expn-errors)
+               (get-full-expansion message tsrc ctx nil)
+             (if (or expn-errors (not (setf msg (input-to-string msg))))
+                 (errors-in-error expn-errors)
+                 (parser-error-state tsrc
+                   (make-error-display
+                     :faulty-input (if (group-p faulty-input)
+                                       (group-contents faulty-input)
+                                       (ensure-vector faulty-input))
+                     :message (vector msg)))))))))
 
 #|
 @BEGIN TEST ERROR

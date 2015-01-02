@@ -73,3 +73,13 @@
                       unless (equal k "") collect k))))
     (aref standard-command-tokens
           (random (length standard-command-tokens)))))
+
+(rand-string-test char-command-soup-robustness
+  ;; Same as CHAR-NOISE-ROBUSTNESS, but with some characters in the string
+  ;; replaced with commands from the standard set.
+  (let ((soup (rand-string 10240
+                (lambda (c)
+                  (if (zerop (mod (random 1000) 4))
+                      (rand-standard-command-token)
+                      (string c))))))
+    (is-true (trap-errors (:rand-string soup) (mex soup) t))))

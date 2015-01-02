@@ -9,7 +9,7 @@
 
 (defclass load-mex-prologue-op (#+asdf-selfward-op selfward-operation
                                 #-asdf-selfward-op operation)
-  ())
+  (#+asdf-selfward-op (selfward-operation :initform nil)))
 
 (defmethod output-files ((op load-mex-prologue-op) component)
   (declare (ignore component))

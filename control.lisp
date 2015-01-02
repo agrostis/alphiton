@@ -163,64 +163,78 @@
           else
             do (stack-push input body)))
 
-  (defun run-iteration (iterator context ship)
-    (let ((iter-ctx (spawn-context context
-                      :command-table (make-table)
-                      :parent-context nil)))
-      (add-command (command-key 'break)
-                   (make-builtin :pattern (vector)
-                                 :handler (lambda (m c s)
-                                            (declare (ignore m c s))
-                                            (return-from run-iteration)))
-                   (command-table iter-ctx))
-      (let ((*group-end-p* #'eot-p)
-            (*verify-group-balance* nil))
-        (funcall iterator
-          (lambda (token-source context)
-            (setf (parent-context iter-ctx) context)
-            (get-group-contents token-source iter-ctx t ship))))))
+  (defun run-iteration (iterator lexical-context ship)
+    (add-command (command-key 'break)
+                 (make-builtin :pattern (vector)
+                               :handler (lambda (m c s)
+                                          (declare (ignore m c s))
+                                          (return-from run-iteration)))
+                 (command-table lexical-context))
+    (let ((*group-end-p* #'eot-p)
+          (*verify-group-balance* nil))
+      (funcall iterator
+        (lambda (token-source context)
+          (get-group-contents token-source context t ship)))))
+
+  (defmacro with-temp-interlay-context ((temp-context context) &body body)
+    (with-var-value (context)
+      (with-ps-gensyms (pctx cmd-table reg-table lctx)
+        `(let* ((,pctx (parent-context ,context))
+                (,cmd-table (make-table))
+                (,reg-table (make-table))
+                (,temp-context (spawn-context ,context
+                                 :parent-context ,pctx
+                                 :command-table ,cmd-table
+                                 :register-table ,reg-table)))
+           (setf (parent-context ,context) ,temp-context)
+           (unwind-protect (progn ,@body)
+             (setf (parent-context ,context) ,pctx))))))
 
   (defun iterate-over-data (iterator reg-command match context ship)
     (let ((body-tsrc (expansion-to-token-source
                        (accumulator match) nil (match-context match))))
-      (run-iteration
+      (with-temp-interlay-context
+          (lctx (token-context (or reg-command (dispatching-token match))))
         (if reg-command
-            (let* ((cmd-table (make-table))
-                   (reg-table (make-table))
-                   (lctx (spawn-context context
-                           :command-table cmd-table
-                           :register-table reg-table)))
+            (let ((cmd-table (command-table lctx))
+                  (reg-table (register-table lctx)))
               (setf reg-command (token-command-key reg-command))
               (add-register-commands reg-command cmd-table reg-table)
+              (run-iteration
+                (lambda (callback)
+                  (funcall iterator
+                    (lambda (datum)
+                      (remember reg-command reg-table datum)
+                      (funcall callback body-tsrc context))))
+                lctx ship))
+            (run-iteration
               (lambda (callback)
                 (funcall iterator
                   (lambda (datum)
-                    (remember reg-command reg-table datum)
-                    (funcall callback body-tsrc lctx)))))
-            (lambda (callback)
-              (funcall iterator
-                (lambda (datum)
-                  (context-stack-push datum context)
-                  (funcall callback body-tsrc context)))))
-        context ship)))
+                    (context-stack-push datum context)
+                    (funcall callback body-tsrc context))))
+              lctx ship)))))
 
   (defun iterate-over-input (iterator pattern match context ship)
     (let ((expander (make-macro
                       :pattern (or pattern (vector))
                       :expansion (accumulator match)))
           (mctx (match-context match)))
-      (run-iteration
-        (lambda (callback)
-          (funcall iterator
-            (lambda (input)
-              (let* ((input-tsrc (expansion-to-token-source input nil mctx))
-                     (body-tsrc (mex-expand (vector expander) nil input-tsrc
-                                            context nil)))
-                (funcall callback body-tsrc context)))))
-        context ship)))
+      (with-temp-interlay-context
+          (lctx (token-context (dispatching-token match)))
+        (run-iteration
+          (lambda (callback)
+            (funcall iterator
+              (lambda (input)
+                (let* ((input-tsrc (expansion-to-token-source
+                                     input nil mctx))
+                       (body-tsrc (mex-expand (vector expander) nil
+                                    input-tsrc context nil)))
+                  (funcall callback body-tsrc context)))))
+          lctx ship))))
 
   (defbuiltin for (reg-cmd start end step
-                   :match match :context ctx :ship ship)
+                   :match match :context ctx :ship ship :token-source tsrc)
     "Consume [<Reg>=]\\ints <Start>\\to <End>[\\by <Step>]<Body>\\endfor,
      where <Reg> is a command token, <Start>, <End> and <Step> are integer
      specs (such as may be used with \\int), and <Body> is a sequence of
@@ -243,20 +257,22 @@
          (match-iteration-body match ctx)
          (yield match reg-cmd start end step))
     :handler
-    (if (numberp step)
-        (when (or (= step 0) (not (eq (>= end start) (> step 0))))
-          (return-from for
-            (parser-error-state* (token-source-state match)
-              "invalidStep" (string-to-input (ensure-string step) ctx))))
-        (setf step (if (>= end start) 1 -1)))
-    (iterate-over-data
-      (lambda (callback)
-        (loop for i :from start :to end :by step
-              do (funcall callback i)))
-      reg-cmd match ctx ship))
+    (block nil
+      (if (numberp step)
+          (when (or (= step 0) (not (eq (>= end start) (> step 0))))
+            (return
+              (parser-error-state* tsrc
+                "invalidStep" (string-to-input (ensure-string step) ctx))))
+          (setf step (if (>= end start) 1 -1)))
+      (iterate-over-data
+        (lambda (callback)
+          (loop for i :from start :to end :by step
+                do (funcall callback i)))
+        reg-cmd match ctx ship)
+      (parser-expansion-state tsrc t)))
 
   (defbuiltin for (reg-cmd start end
-                   :match match :context ctx :ship ship)
+                   :match match :context ctx :ship ship :token-source tsrc)
     "Consume [<Reg>=]\\chars <Start>\\to <End><Body>\\endfor, where <Reg> is
      a command token, <Start> and <End> are character tokens, and <Body> is
      a sequence of tokens with properly balanced \\for...\\endfor.  Iterate
@@ -286,9 +302,29 @@
                 for tok := (make-char-token :chr c :context ctx
                                             :category (char-cat c))
                 do (funcall callback tok)))
-        reg-cmd match ctx ship)))
+        reg-cmd match ctx ship)
+      (parser-expansion-state tsrc t)))
 
 )
+
+#|
+@BEGIN TEST CONTROL1
+@MEX
+\insignificantWhitespaces
+\def\multipleof#N{\int#N\rem\int0\eq}
+\for\x=\ints 2 \to 4
+  \for\ints 7 \to 9
+    \if \dup\x\rem\int3\geq \then \break
+    \elsif \dup\x\mul\multipleof3 \then \pop*\x\pop\blank
+    \elsif \dup\x\add\multipleof5 \then \pop+\x\pop\blank
+    \else \discard
+    \endif
+  \endfor
+\endfor
+@JSON
+{"t": "8+2 9*2 7*3 8*3 9*3 "},
+@END TEST
+|#
 
 ;;; Local Variables: ***
 ;;; mode:lisp ***

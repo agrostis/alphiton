@@ -333,8 +333,11 @@
 
 
 (defvar *default-category-table*
-  #.(cat-table-from-unicode-blocks "Basic Latin" "Cyrillic"
-                                   "Latin-1 Supplement")
+  #.(cat-table-from-unicode-blocks
+      #| TBD: compile all of Unicode once done with testing |#
+      "Basic Latin" "Latin-1 Supplement"
+      "Cyrillic" "Greek and Coptic" "CJK Unified Ideographs"
+      "Mathematical Operators" "Miscellaneous Symbols")
   "Category table with definitions from Unicode.")
 
 (defvar *plain-category-table*

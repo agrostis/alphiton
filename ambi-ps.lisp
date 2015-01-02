@@ -740,6 +740,14 @@
           end
           and collect arg))
 
+(defun just-body (body)
+  "Return BODY sans docstring and declarations."
+  (loop for body* :on body
+        for (expr) := body*
+        while (or (stringp expr)
+                  (and (consp expr) (eq 'declare (car expr))))
+        finally (return body*)))
+
 (defpsmacro defgeneric (name (obj &rest other-args) &rest methods-etc)
   "Define a function named NAME which tries to apply the corresponding
    method of its first argument OBJ to OTHER-ARGS.  If OBJ is no object or
@@ -775,8 +783,8 @@
                              (if (eq ob obj) renames
                                  (cons `(,ob ,obj) renames))))))
               (if renames
-                  `(let (,@renames) ,@body)
-                  `(progn ,@body)))))
+                  `(let (,@renames) ,@(just-body body))
+                  `(progn ,@(just-body body))))))
          (docstring
           (loop
             for (kwd def) :in methods-etc
@@ -804,7 +812,7 @@
            (t obj-type))))
     `(setf (@ ,constructor prototype ,name)
            (lambda ,(just-arg-names other-args)
-             (let ((,obj this)) ,@body)))))
+             (let ((,obj this)) ,@(just-body body))))))
 
 
 ;; Syntax extensions

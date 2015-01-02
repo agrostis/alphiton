@@ -43,7 +43,7 @@
        - REQUISITE-BASE (if supplied and negative)."
       (and (> (logand cat *ccat-constituent*) 0)
            (cond ((null requisite-base))
-                 ((minusp requisite-base)
+                 ((< requisite-base 0)
                   (not (eq (ccat-base cat) (- requisite-base))))
                  (t (eq (ccat-base cat) requisite-base)))))
 

@@ -804,9 +804,8 @@ ABCDE\exch\dup \int5\int-3\roll \int4\int2\roll 42\roll\exch
   (defbuiltin-stack-funop havebool ((x any))
     (or (true-p x) (false-p x)))
 
-  (defbuiltin-stack-funop havetokens ((x any))
-    (and (vectorp x)
-         (or (= (length x) 0) (token-p (aref x 0)))))
+  (defbuiltin-stack-funop havetoken ((x any))
+    (token-p x))
 
   (defbuiltin-stack-funop haveerror ((x any))
     (error-display-p x))

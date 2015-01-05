@@ -50,9 +50,15 @@
   :depends-on (#:parenscript #:cl-unicode #:cl-json #:cl-ppcre)
   :components
     ((:static-file "mex.asd")
+     (:module #:patch-deps
+        :serial t
+        :pathname ""
+        :components
+          ((:file "patch-ps")))
      (:module #:src
         :serial t
         :pathname ""
+        :depends-on (#:patch-deps)
         :components
           ((:file "package")
            (:file "ambi-ps")

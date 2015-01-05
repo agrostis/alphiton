@@ -101,25 +101,34 @@
     (replace-context tok ctx match))
 
   (defbuiltin parent (tok :match match :context ctx)
-    "Consume one token.  Expand to a token which is just like the consumed
-     but whose native context is the parent of the local context (group), or
-     of its nearest opaque ancestor."
-    #| TBD: \parent\parent... |#
+    "Consume zero or more additional \\parent tokens, followed by one other
+     token.  Expand to a token which is just like the last one consumed but
+     whose native context is the parent (the parent of the parent, etc.) of
+     the local context (group), or of its nearest opaque ancestor."
     :pattern
-    (match-setf-and-yield ((tok token #'non-eot-token-p)) match ctx)
+    (loop for tok := (next-token/shift (token-source-state match) ctx)
+          while (token-is tok :command "parent")
+          do (incf (match-length match))
+             (incf (matched-token-count match))
+          finally (when (non-eot-token-p tok)
+                    (incf (match-length match))
+                    (return (yield match tok))))
     :handler
-    (let ((parent-ctx
-           (let ((octx (ensure-opaque-context ctx)))
-             (and octx (parent-context octx)))))
-      (replace-context tok parent-ctx match)))
+    (loop for i :from 0 :to (matched-token-count match)
+          for dtoks := (ensure-vector (dispatching-token match))
+                 :then (spliced dtoks 0 0 (dispatching-token match))
+          with pctx := (ensure-opaque-context ctx)
+          while pctx do (setq pctx (parent-context pctx))
+          finally (setf (dispatching-token match) dtoks)
+                  (return (replace-context tok pctx match))))
 
 #|
 @BEGIN TEST REPLACE-CONTEXT
 @MEX
 \def\loc{outer} {\def\loc{middle} {\def\loc{inner}
-\loc{} vs. \global\loc{} vs. \parent\loc{}}}
+\loc{} vs. \global\loc{} vs. \parent\loc{} vs. \parent\parent\loc{}}}
 @JSON
-{"t": "  \ninner vs. outer vs. middle"}
+{"t": "  \ninner vs. outer vs. middle vs. outer"}
 @END TEST
 
 @BEGIN TEST REPLACE-CONTEXT-FOR-DEF

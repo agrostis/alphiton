@@ -333,7 +333,7 @@
               (put-data (lookup key register-table nil) context)
               (parser-expansion-state (token-source-state match) t)))
            (assign 
-             (tokens :chars "="))
+             (tokens% :chars "="))
            (setter
             (lambda (match context ship)
               (let* ((tsrc (token-source-state match))
@@ -658,16 +658,16 @@
           for arg-input
             := (cond
                  ((error-display-p arg)
-                  (tokens :chars (string #.(code-char #x2191))))
+                  (tokens% :chars (string #.(code-char #x2191))))
                  ((or (token-p arg) (group-p arg))
                   (vector-add
-                   (tokens :chars (string #.(code-char #xAB)))
+                   (tokens% :chars (string #.(code-char #xAB)))
                    (string-to-input (input-to-string arg)
                      *root-context* *plain-category-table*)
-                   (tokens :chars (string #.(code-char #xBB)))))
+                   (tokens% :chars (string #.(code-char #xBB)))))
                  (t (data-to-input* arg *root-context*)))
           for args-input := arg-input
-            :then (vector-add args-input (tokens :chars " ") arg-input)
+            :then (vector-add args-input (tokens% :chars " ") arg-input)
           for error := nil
             :then (if (error-display-p arg)
                       (error-display* :add-to error :append arg
@@ -679,9 +679,9 @@
                 :append-input dispatching :sep ellipsis
                 :append-message
                   (vector-add
-                    (tokens :command "stackOpInvalidArgs" :chars "{")
+                    (tokens% :command "stackOpInvalidArgs" :chars "{")
                     args-input
-                    (tokens :chars "}")))))))
+                    (tokens% :chars "}")))))))
 
   (defbuiltin discard (:match match :context ctx :dispatching dispatching
                        :token-source tsrc)

@@ -441,18 +441,18 @@
                        (pattern0 (and cmd (command-pattern cmd)))
                        (pattern (if (vectorp pattern0)
                                     pattern0
-                                    (tokens :chars "<Pattern>")))
+                                    (tokens% :chars "<Pattern>")))
                        (input (if (char-source token-source)
-                                  (tokens :chars "<Character source>")
+                                  (tokens% :chars "<Character source>")
                                   (cached-tokens token-source))))
                   (make-error-display
-                    :message (tokens :command "patternMismatch")
+                    :message (tokens% :command "patternMismatch")
                     :faulty-input (vector-add
-                                    (tokens :chars "{")
+                                    (tokens% :chars "{")
                                     pattern
-                                    (tokens :chars "}{")
+                                    (tokens% :chars "}{")
                                     input
-                                    (tokens :chars "}")))))
+                                    (tokens% :chars "}")))))
             token-source nil))))
 
   #| TBD: recursion guards |#

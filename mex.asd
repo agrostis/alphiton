@@ -38,7 +38,7 @@
 (defun write-js (js-file)
   (let ((writer (ignore-errors
                   (symbol-function
-                    (find-symbol "WRITE-JS" (find-package "MEX"))))))
+                    (find-symbol "WRITE-JS%" (find-package "MEX"))))))
     (when writer (funcall writer js-file))))
 
 (defsystem #:mex
@@ -47,7 +47,7 @@
   :maintainer "Boris Smilga <boris.smilga@gmail.com>"
   :licence "BSD"
   :description "A macro processor for Web authoring" 
-  :depends-on (#:parenscript #:cl-unicode #:cl-json)
+  :depends-on (#:parenscript #:cl-unicode #:cl-json #:cl-ppcre)
   :components
     ((:static-file "mex.asd")
      (:module #:src
@@ -66,6 +66,7 @@
            (:file "control")
            (:file "dom")
            (:static-file "prologue.mex")
+           (:static-file "mex.js")
            (:file "mex"
               :in-order-to ((compile-op
                              (load-mex-prologue-op "prologue.mex")))))

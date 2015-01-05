@@ -10,7 +10,7 @@
     "Check material collected by MATCH-CONDITIONAL for common syntax errors.
      Return an error display, or null, if the syntax is correct."
     (let ((errors nil)
-          (ellip (tokens :chars "...")))
+          (ellip (tokens% :chars "...")))
       (flet ((add-error (ed sep)
                (setf errors (error-display*
                               :add-to errors :sep sep :append ed))))

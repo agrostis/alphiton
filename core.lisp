@@ -4,7 +4,7 @@
 
 (ambi-ps ()
 
-  (defvar ellipsis (tokens :chars "...")
+  (defvar ellipsis (tokens% :chars "...")
     "Tokens representing ellipsis in reconstructed faulty input of error
      displays.")
 
@@ -157,7 +157,7 @@
             (parser-error-state tsrc
               (if proto-lcid
                   (error-display* :add-to ed
-                    :append-input (tokens :command "like") proto-lcid)
+                    :append-input (tokens% :command "like") proto-lcid)
                   ed))))))
 
   (defbuiltin setlang (lcid :match match :context ctx

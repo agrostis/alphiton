@@ -305,7 +305,7 @@
                       (normalize-cat-table-mapping mapping main-cat)))
                 (return (cat-table minc maxc main-cat mapping))))))
 
-  (defun cat-table-from-unicode-blocks (&rest blocks)
+  (defun cat-table-from-unicode-blocks% (&rest blocks)
     "Take some Unicode block names and make a category table for the whole
      Unicode code point range, using Unicode data for the included
      characters to initialize the categories in the table."
@@ -333,7 +333,7 @@
 
 
 (defvar *default-category-table*
-  #.(cat-table-from-unicode-blocks
+  #.(cat-table-from-unicode-blocks%
       #| TBD: compile all of Unicode once done with testing |#
       "Basic Latin" "Latin-1 Supplement"
       "Cyrillic" "Greek and Coptic" "CJK Unified Ideographs"

@@ -2,16 +2,16 @@
 
 ;; Equality of DOM objects
 
-(defun dom-equal* (a b)
+(defun dom-equal% (a b)
   "On Lisp side, this is like DOM-EQUAL, but with some special cases."
   (or (and (stringp a) (stringp b)
            (string= a b))
       (and (consp a) (consp b)
-           (dom-equal* (car a) (car b))
-           (dom-equal* (cdr a) (cdr b)))
+           (dom-equal% (car a) (car b))
+           (dom-equal% (cdr a) (cdr b)))
       (dom-equal a b)))
 
-(defpsfun dom-equal* (a b)
+(defpsfun dom-equal% (a b)
   "On JavaScript side, this is, effectively, an alias for DOM-EQUAL."
   (dom-equal a b))
 
@@ -20,18 +20,18 @@
   (or (and (dom-element-p a) (dom-element-p b)
            (equal (element-name a) (element-name b))
            (dom-equal (element-attributes a) (element-attributes b))
-           (dom-equal* (element-content a) (element-content b)))
+           (dom-equal% (element-content a) (element-content b)))
       (and (dom-text-p a) (dom-text-p b)
            (equal (text-content a) (text-content b)))
       (and (dom-comment-p a) (dom-comment-p b)
-           (dom-equal* (comment-content a) (comment-content b)))
+           (dom-equal% (comment-content a) (comment-content b)))
       (and (dom-recipe-p a) (dom-recipe-p b)
            (equal (recipe-handler-name a) (recipe-handler-name b))
-           (dom-equal* (recipe-data a) (recipe-data b)))
+           (dom-equal% (recipe-data a) (recipe-data b)))
       (and (tablep a) (tablep b)
-           (table-equal a b #'dom-equal*))
+           (table-equal a b #'dom-equal%))
       (and (vectorp a) (vectorp b)
-           (vector-equal a b #'dom-equal*))
+           (vector-equal a b #'dom-equal%))
       (equal a b)))
 
 (defun dom-p (thing)
@@ -110,7 +110,7 @@
         until (stack-empty-p (element-stack stacks))
         finally (return elt)))
 
-(defgeneric dom-to-json (dom)
+(defgeneric dom-to-json% (dom)
   (:documentation "Encode DOM tree as JSON.")
   (:method ((elt dom-element))
     (json:with-object ()
@@ -119,7 +119,7 @@
       (json:as-object-member (:p)       ; P is for payload
         (json:with-array ()
           (loop for child :across (element-content elt)
-                do (json:as-array-member () (dom-to-json child)))))))
+                do (json:as-array-member () (dom-to-json% child)))))))
   (:method ((text dom-text))
     (json:with-object ()
       (json:encode-object-member :t (text-content text))))
@@ -136,12 +136,12 @@
                  (let ((datum (type-error-datum err)))
                    (if (or (token-p datum) (group-p datum))
                        (json:encode-json (input-to-string datum))
-                       (dom-to-json datum))))))
+                       (dom-to-json% datum))))))
           (json:encode-json (recipe-data recipe))))))
   (:method ((thing t))
     (json:encode-json nil)))
         
-(defun json-to-dom (json)
+(defun json-to-dom% (json)
   (let ((dom-accumulator nil))
     (declare (special dom-accumulator))
     (labels ((get-dom-accumulator (keysym)

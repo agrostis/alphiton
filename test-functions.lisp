@@ -31,7 +31,7 @@
 (defun format-as-error-json (input eotp messages counter)
   (with-output-to-string (out)
     (let ((json:*json-output* out))
-      (dom-to-json
+      (dom-to-json%
         (funcall *dom-error-wrapper*
           input eotp messages
           (format nil "MexError~A" counter))))))
@@ -179,9 +179,9 @@
                                `(let ,bindings ,mex-call-0)
                                mex-call-0))
                  (json-call `(funcall *dom-root-wrapper*
-                                      (json-to-dom ,jsonv))))
+                                      (json-to-dom% ,jsonv))))
             (pprint-for-test
-              `(test ,id (is (dom-equal* ,json-call ,mex-call)))
+              `(test ,id (is (dom-equal% ,json-call ,mex-call)))
               out))
           (terpri out))))))
 

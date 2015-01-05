@@ -276,7 +276,7 @@
     "Wrapper for TOKENS* to allow its use in ParenScript macros."
     `(struct (lisp (tokens* ,@spec))))
 
-  (defmacro+ps tokens (&rest spec)
+  (defmacro+ps tokens% (&rest spec)
     "Notation for token vector literals; see TOKENS*."
     (apply #'tokens** spec))
 

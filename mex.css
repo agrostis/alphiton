@@ -1,0 +1,37 @@
+span.mex_error_display {
+  color: red;
+  font-weight: bold;
+  cursor: help;
+}
+
+span.mex_error_display span.mex_eot:before {
+  content: "EOT";
+}
+span.mex_error_display span.mex_eot {
+  background-color: red;
+  color: white;
+  font-size: small;
+  font-weight: normal;
+  padding: 1px 3px;
+}
+
+span.mex_error_display span.mex_error_messages {
+  z-index: 10;
+  display: none;
+  padding: 8px 10px;
+  margin-top: -16px;
+  margin-left: 10px;
+  width: 120px;
+  font-size: x-small;
+  font-weight: normal;
+}
+span.mex_error_display:hover {
+  border-bottom: 1px dotted #D88;
+}
+span.mex_error_display:hover span.mex_error_messages {
+  display: inline;
+  position: absolute;
+  color: #555;
+  border: 1px solid #D88;
+  background: #FCC;
+}

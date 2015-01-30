@@ -196,9 +196,15 @@
         :class "mex_error_display" :id id
         (text-node input)
         (when eotp (element "SPAN" :class "mex_eot"))
-        (recipe "mex_error_display_attach_messages"
-          (js-quote ((:id . (js-unquote id))
-                     (:messages . (js-unquote messages)))))))
+        (let ((msg-elt (element "SPAN" :class "mex_error_messages")))
+          (setf (element-content msg-elt)
+                  (ensure-vector
+                    (loop for msg :across messages
+                          for sep := nil then t
+                          if sep collect (element "BR")
+                            and collect (element "BR")
+                          collect (element "SPAN" (text-node msg)))))
+          msg-elt)))
     "The value is a function returning a DOM-ELEMENT that Mex should
      substitute for an ERROR-DISPLAY.  The function should accept four
      arguments: a string representing the faulty input, a boolean indicating

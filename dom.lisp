@@ -223,6 +223,103 @@
                     (funcall endh))))
           (json:decode-json-from-source json))))))
 
+
+;; Lisp-side rendering
+
+(ambi-ps (nil)
+  (defvar *render-recipes* (make-table)
+    "Table mapping recipe names to functions invoked at render time.")
+
+  (defvar *render-stream* nil
+    "Stream for rendering DOM trees.")
+
+  (let ((re (cl-ppcre:create-scanner "(&)|(<)|(>)|(\")|(--)")))
+    (defun xml-quote (str &key ((:quot quot-p)) ((:hyphens hyphens-p)))
+      (cl-ppcre:regex-replace-all re str
+        (lambda (match amp lt gt quot hyphens)
+          (cond (amp "&amp;") (lt "&lt;") (gt "&gt;")
+                ((and quot quot-p) "&quot;")
+                ((and hyphens hyphens-p) "&#x2d;&#x2d;")
+                (t match)))
+        :simple-calls t)))
+
+  (defgeneric render (dom &optional stream)
+    (:documentation "Render DOM tree.")
+    (:method :around (dom &optional (stream t stream-supplied-p))
+      (let ((*render-stream*
+             (case (or (not stream-supplied-p) stream)
+               ((nil) (make-string-output-stream))
+               ((t) *standard-output*)
+               (t stream))))
+        (call-next-method dom *render-stream*)
+        (if (and stream-supplied-p (eq stream nil))
+            (get-output-stream-string *render-stream*))))
+    (:method ((elt dom-element) &optional stream)
+      (format stream "<~A" (element-name elt))
+      (when (element-attributes elt)
+        (map-table
+         (lambda (attr val)
+           (format stream " ~A=\"~A\""
+                   (ensure-string attr)
+                   (xml-quote (ensure-string val) :quot t)))
+         (element-attributes elt)))
+      (if (zerop (length (element-content elt)))
+          (format stream "/>")
+          (progn
+            (format stream ">")
+            (loop for child :across (element-content elt)
+                  do (render child stream))
+            (format stream "</~A>" (element-name elt)))))
+    (:method ((text dom-text) &optional stream)
+      (princ (xml-quote (text-content text)) stream))
+    (:method ((comment dom-comment) &optional stream)
+      (format stream "<!-- ~A -->"
+              (xml-quote (comment-content comment) :hyphens t)))
+    (:method ((recipe dom-recipe) &optional stream)
+      (let ((recipe-handler
+             (lookup (recipe-handler-name recipe) *render-recipes*)))
+        (when recipe-handler
+          (render (funcall recipe-handler (recipe-data recipe))
+                  stream))))
+    (:method ((thing t) &optional stream)
+      (princ (xml-quote (ensure-string thing)) stream)))
+)
+
+;; JS-side rendering
+
+(ambi-ps (*js-target*)
+  (defvar *render-recipes* (make-table)
+    "Table mapping recipe names to functions invoked at render time.")
+
+  (defgeneric render (dom document)
+    (:documentation "Render DOM tree in the context of a document.")
+    (:method ((elt dom-element) document)
+      (let ((r-elt ((@ document create-element) (element-name elt))))
+        (when (element-attributes elt)
+          (map-table
+            (lambda (attr val) ((@ r-elt set-attribute) attr val))
+            (element-attributes elt)))
+        (loop for child :across (element-content elt)
+              for r-child := (render child document)
+              if r-child do ((@ r-elt append-child) r-child))
+        r-elt))
+    (:method ((text dom-text) document)
+      ((@ document create-text-node) (text-content text)))
+    (:method ((comment dom-comment) document)
+      ((@ document create-comment) (comment-content comment)))
+    (:method ((recipe dom-recipe) document)
+      (let ((recipe-handler
+             (lookup (recipe-handler-name recipe) *render-recipes*)))
+        (when recipe-handler
+          (render (funcall recipe-handler (recipe-data recipe))
+                  document))))
+    (:method (thing document)
+      (cond ((stringp thing)
+             ((@ document create-text-node) thing))
+            ((and (objectp thing) (instanceof thing *node))
+             thing))))
+)
+
 ;;; Local Variables: ***
 ;;; mode:lisp ***
 ;;; local-font-lock-keywords:(("(\\(def\\(?:\\(ps\\(?:macro\\|fun\\)\\|\\(?:un\\|macro\\)\\+ps\\)\\|\\(guard\\|enum\\)\\|\\(struct-guarded\\)\\)\\)[ \t\n]+(?\\([^()]*?\\)[ \t\n]" (1 font-lock-keyword-face) (5 (cond ((match-beginning 2) font-lock-function-name-face) ((match-beginning 3) font-lock-variable-name-face) ((match-beginning 4) font-lock-type-face)))) ("(\\(ambi-ps\\)\\_>" (1 font-lock-preprocessor-face))) ***

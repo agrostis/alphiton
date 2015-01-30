@@ -18,7 +18,8 @@
            #:make-dom-comment #:comment-content
            #:make-dom-recipe #:recipe-handler-name #:recipe-data
            #:*dom-root-wrapper* #:*dom-error-wrapper*
-           #:dom-to-json% #:json-to-dom% #:dom-equal #:dom-equal%))
+           #:dom-to-json% #:json-to-dom% #:dom-equal #:dom-equal%
+           #:*render-recipes* #:render))
 
 (defvar mex::%prologue% ""
   "Code to run at start of Mex processing.

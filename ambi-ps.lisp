@@ -666,6 +666,15 @@
         (decf count)))
     (= count 0)))
 
+(defun map-table (fn table)
+  "Map function FN over the entries in TABLE."
+  (maphash fn table))
+
+(defpsfun map-table (fn table)
+  "Map function FN over the entries in TABLE."
+  (for-in (prop table)
+    (when ((@ table has-own-property) prop)
+      (funcall fn prop (getprop table prop)))))
 
 ;; Data templates
 

@@ -135,20 +135,20 @@
            (declare (ignore body-start body-end right-edge))
            (flet ((take (start end)
                     (and start
-                         (sliced exceptions start (or end right-end)))))
+                         (sliced exceptions start (or* end right-end)))))
              (let ((left (take left-start left-end))
                    (right (take right-start right-end)))
                ;; An exception surrounding PIVOT is further divided, and
                ;; each part appended to the exceptions on its own side.
-               (if left-edge
-                   (cat-table-divide (aref exceptions left-edge) pivot
-                     (lambda (el er)
-                       (setf (exceptions ct-left)
-                               (vector-add left (vector el))
-                             (exceptions ct-right)
-                               (vector-add (vector er) right))))
-                   (setf (exceptions ct-left) left
-                         (exceptions ct-right) right))))))
+               (if* left-edge
+                    (cat-table-divide (aref exceptions left-edge) pivot
+                      (lambda (el er)
+                        (setf (exceptions ct-left)
+                                (vector-add left (vector el))
+                              (exceptions ct-right)
+                                (vector-add (vector er) right))))
+                    (setf (exceptions ct-left) left
+                          (exceptions ct-right) right))))))
         (funcall cont ct-left ct-right)))
 
     (declaim (ftype function cat-table))
@@ -357,7 +357,7 @@
      arguments, return a new table resulting from assigning CHAR the
      category CAT in TABLE."
     (let ((code (if (numberp char) char (char-code char)))
-          (exceptions (exceptions table)))
+          (exceptions (or (exceptions table) #())))
       (call-with-cat-table-range-divided exceptions code code
         (lambda (left-start left-end left-edge body-start
                  body-end right-edge right-start right-end)
@@ -371,27 +371,27 @@
                     right-start (and right-start (aref exceptions right-start))
                     right-end))
            |#
-          (let ((matching-exception (or left-edge body-start)))
+          (let ((matching-exception (or* left-edge body-start)))
             (if assign
-                (if matching-exception
-                    (let* ((exc (aref exceptions matching-exception))
-                           (exc+ (char-cat code exc cat)))
-                      (if (eq exc exc+) table
-                          (let ((table+ (copy-structure table)))
-                            (setf (exceptions table+)
-                                    (spliced exceptions matching-exception
-                                             1 exc+))
-                            table+)))
-                    (if (eq cat (category table)) table
-                        (let ((table+ (copy-structure table)))
-                          (setf (exceptions table+)
-                                  (spliced exceptions
-                                           (or right-start right-end)
-                                           0 (cat-point code cat)))
-                          table+)))
-                (if matching-exception
-                    (char-cat code (aref exceptions matching-exception))
-                    (category table))))))))
+                (if* matching-exception
+                     (let* ((exc (aref exceptions matching-exception))
+                            (exc+ (char-cat code exc cat)))
+                       (if (eq exc exc+) table
+                           (let ((table+ (copy-structure table)))
+                             (setf (exceptions table+)
+                                     (spliced exceptions matching-exception
+                                              1 exc+))
+                             table+)))
+                     (if (eq cat (category table)) table
+                         (let ((table+ (copy-structure table)))
+                           (setf (exceptions table+)
+                                   (spliced exceptions
+                                            (or* right-start right-end)
+                                            0 (cat-point code cat)))
+                           table+)))
+                (if* matching-exception
+                     (char-cat code (aref exceptions matching-exception))
+                     (category table))))))))
 
 )
 

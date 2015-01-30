@@ -177,6 +177,24 @@
       (eq thing null)
       (eq thing undefined)))
 
+(defmacro or* (expr0 &rest exprs)
+  "Same as OR."
+  `(or ,expr0 ,@exprs))
+
+(defpsmacro or* (expr0 &rest exprs)
+  "Same as OR, except that non-boolean falses are considered true."
+  (if (null exprs) expr0
+      (with-var-value (expr0)
+        `(if (false-p ,expr0) (or* ,@exprs) ,expr0))))
+
+(defmacro if* (cond &rest branches)
+  "Same as IF."
+  `(if ,cond ,@branches))
+
+(defpsmacro if* (cond &rest branches)
+  "Same as IF, except that non-boolean falses are considered true."
+  `(if (not (false-p ,cond)) ,@branches))
+
 
 ;; Numbers
 
@@ -553,12 +571,12 @@
 (defun+ps copy-stack (thing)
   "Copy THING to a newly created stack.  If THING is an array it is copied
    elementwise, if not, as single element."
-  (let ((new (make-stack)))
+  (let ((new-stack (make-stack)))
     (if (vectorp thing)
         (loop for x :across thing
-              do (stack-push x new))
-        (stack-push thing new))
-    new))
+              do (stack-push x new-stack))
+        (stack-push thing new-stack))
+    new-stack))
 
 
 ;; Lookup tables, implemented as hash tables in Lisp, as objects in JS.
@@ -696,7 +714,7 @@
     (transform data)))
 
 
-;; Structures
+;; Objects
 
 ;; The use of a DEFSTRUCT form in ParenScript should cause to be defined
 ;; the same constructor, predicate, copier, and member accessors as in
@@ -745,22 +763,26 @@
                      (:include (setf super arg))))))
     ;; Discard documentation string.
     (when (stringp (car slots)) (pop slots))
-    (let ((accessors
+    (let ((*name (intern (format nil "*~a" name)))
+          (constructor (intern (format nil "MAKE-~a" name)))
+          (predicate (intern (format nil "~a-P" name)))
+          (accessors
            (loop for slot :in slots
                  collect (if conc
                              (intern (format nil "~a~a" conc slot))
                              slot))))
       `(progn
-         (defun ,name (,@slots)
+         (defun ,*name (,@slots)
            ,(format nil "Create a new instance of ~A." name)
            ,@(loop for slot :in slots
                    collect `(setf (@ this ,slot) ,slot))
            nil)
          ,(when super
-            `(setf (@ ,name prototype) (new (,super))))
+            (let ((*super (intern (format nil "*~a" super))))
+              `(setf (@ ,*name prototype) (new (,*super)))))
          (lisp*
           (defmethod make-struct-ps ((struct ,name))
-            (let ((obj ',name)
+            (let ((obj ',*name)
                   (init-list (list
                               ,@(loop for accessor :in accessors
                                       collect `(make-struct-ps
@@ -769,15 +791,15 @@
          (lisp*
           (defmethod make-load-form ((struct ,name) &optional environment)
             (declare (ignorable environment))
-            (list ',(intern (format nil "MAKE-~a" name))
+            (list ',constructor
                   ,@(loop
                       for slot :in slots
                       for kwd := (intern (symbol-name slot) '#:keyword)
                       for accessor :in accessors
                       nconc (list kwd `(,accessor struct))))))
-         (defmacro ,(intern (format nil "MAKE-~a" name)) (&rest init-list)
-           (let* ((obj ',name)
-                  (instance (ps-gensym (format nil "~a-" obj))))
+         (defmacro ,constructor (&rest init-list)
+           (let ((obj ',*name)
+                 (instance (ps-gensym (format nil "~a-" ',name))))
              `(let ((,instance (new (,obj))))
                 ,@(loop for (kwd value) :on init-list :by #'cddr
                         for slot = (intern (symbol-name kwd))
@@ -785,11 +807,8 @@
                 ,instance)))
          ,(when (external-p constructor)
             `(defun ,constructor () (,constructor)))
-         (defmacro ,(intern (format nil "~a-P" name)) (thing)
-           (let ((obj ',name))
-             (form-with-var-value thing
-               (lambda (thing)
-                 `(and (objectp ,thing) (instanceof ,thing ,obj))))))
+         (defun ,predicate (thing)
+           (and (objectp thing) (instanceof thing ,*name)))
          ,@(loop for slot :in slots
                  for accessor :in accessors
                  collect
@@ -813,7 +832,7 @@
      copy))
 
 
-;; Limited support for methods specialized to object types
+;; Methods specialized to object types (of the first argument only)
 
 (defun just-arg-names (lambda-list)
   "Return LAMBDA-LIST sans keywords."
@@ -879,7 +898,7 @@
        (defun ,name (,obj ,@other-args)
          ,(or docstring
               (format nil "Try to call method ~A of ~A." name obj))
-         (if (and (objectp ,obj) (functionp (@ ,obj ,name)))
+         (if (and ,obj (objectp ,obj) (functionp (@ ,obj ,name)))
              ((@ ,obj ,name) ,@plain-args)
              ,default-method-expr))
        ,@(loop for (kwd . def) :in methods-etc
@@ -895,7 +914,7 @@
            ((array) '*array)
            ((boolean) '*boolean)
            ((number) '*number)
-           (t obj-type))))
+           (t (intern (format nil "*~a" obj-type))))))
     `(setf (@ ,constructor prototype ,name)
            (lambda ,(just-arg-names other-args)
              (let ((,obj this)) ,@(just-body body))))))

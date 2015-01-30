@@ -823,7 +823,7 @@
   (let ((cmd (command-key name)))
     (remember cmd table #())))
 
-(defun builtin-curry-handler (builtin &rest args)
+(defun+ps builtin-curry-handler (builtin &rest args)
   (let ((handler (builtin-handler builtin)))
     (make-builtin
       :handler (lambda (match context ship &rest args*)

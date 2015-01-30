@@ -257,11 +257,11 @@
            ,@body))))
 
   (defmethod data-to-input ((element dom-element) context)
-    (element-attr-bind (id class) element
+    (element-attr-bind (id (cls "class")) element
       (let ((elt-name (element-name element))
-            (hash-id (if id (interpolate "###{id}") ""))
-            (dot-class (if class (interpolate ".#{class}") "")))
-        (string-to-input (interpolate "<#{elt-name}#{hash-id}#{dot-class}/>")
+            (hash-id (if* id (interpolate "###{id}") ""))
+            (dot-cls (if* cls (interpolate ".#{cls}") "")))
+        (string-to-input (interpolate "<#{elt-name}#{hash-id}#{dot-cls}/>")
                          context *plain-category-table*))))
 
   (defmethod data-to-input ((text-node dom-text) context)

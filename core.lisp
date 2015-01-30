@@ -507,7 +507,7 @@
          (errors-in-error message))
         (t (parser-state-bind (:accumulator msg :error expn-errors)
                (get-full-expansion message tsrc ctx nil)
-             (if (or expn-errors (not (setf msg (input-to-string msg))))
+             (if (or expn-errors (false-p (setf msg (input-to-string msg))))
                  (errors-in-error expn-errors)
                  (parser-error-state tsrc
                    (make-error-display

@@ -63,10 +63,10 @@
                    :add-to eot :append-message "eotInGroup")
                  (progn
                    (setf (group-end grp)
-                           (or (and term (token-end term))
-                               (let ((last (aref* contents -1)))
-                                 (and last (input-end last)))
-                               (token-end tok0))
+                           (or* (and term (token-end term))
+                                (let ((last (aref* contents -1)))
+                                  (and last (input-end last)))
+                                (token-end tok0))
                          (group-contents grp)
                            contents
                          (group-rbrace grp)

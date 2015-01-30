@@ -47,7 +47,7 @@
                             (spliced msg (length msg) 0
                                      (ensure-vector append-message))))
                        (t msg)))
-                   (let* ((msg0 (or prepend-message append-message))
+                   (let* ((msg0 (or* prepend-message append-message))
                           (msg (and msg0 (ensure-vector msg0))))
                      (when msg
                        (if (vectorp (aref* msg 0)) msg (vector msg)))))))
@@ -339,7 +339,7 @@
     (:documentation "Return the character position where THING ends.")
     (:method (thing) (declare (ignore thing)) nil)
     (:method ((tok token)) (token-end tok))
-    (:method ((tok newline-token)) (or (token-par-end tok) (token-end tok)))
+    (:method ((tok newline-token)) (or* (token-par-end tok) (token-end tok)))
     (:method ((ed error-display)) (input-end (faulty-input-last ed))))
 
   (declaim
@@ -717,10 +717,10 @@
                  (equal nm "par")
                  #| ... |#)))
       (and (command-token-p token)
-           (if name
-               (and (equal (token-name token) name)
-                    (specialp name))
-               (specialp (token-name token))))))
+           (if* name
+                (and (equal (token-name token) name)
+                     (specialp name))
+                (specialp (token-name token))))))
 
   (declaim (ftype function simulate-command-with-input))
 
@@ -749,7 +749,7 @@
                             (cached-token-offset token-source))
                       (let ((tok (token-at
                                    (char-source token-source)
-                                   (or (char-source-offset token-source) 0)
+                                   (or* (char-source-offset token-source) 0)
                                    context)))
                         (when (stack-p (cached-tokens token-source))
                           (unless (eot-p tok)

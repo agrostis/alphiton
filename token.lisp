@@ -929,7 +929,7 @@ dolor\
 Lorem ipsum dolor #\
 @JSON
 [{"t": "Lorem ipsum dolor "},
- @ERROR IN "#\\" @EOT ("EOT occurred while parsing command token" "EOT occurred while parsing parameter token")
+ @ERROR IN ("#\\" :EOT) ("EOT occurred while parsing command token" "EOT occurred while parsing parameter token")
 ]
 @END TEST
 |#

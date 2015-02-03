@@ -74,31 +74,6 @@
   `(ambi-ps ()
      (defun ,name (,@args) ,@body)))
 
-(defun js-pattern-cutoff-line (line)
-  (flet ((getsym (s) (find-symbol s '#:mex)))
-    (cl-ppcre:register-groups-bind (nil (#'getsym disposition) (#'getsym section))
-        ("^/(\\*{8,}) (BEGIN|END) ([A-Z0-9-]+) \\1/$" line)
-      (and section (cons disposition section)))))
-
-(defun read-js-get-pattern (js-file)
-  (with-open-file (in js-file :direction :input)
-    (loop for line := (read-line in nil nil)
-          with have-line := t
-          with accum := (make-string-output-stream)
-          while have-line
-          for (disposition . section)
-            := (and line (js-pattern-cutoff-line line))
-          if (and (eq disposition 'end) (eq section accum))
-            collect accum
-            and do (setq accum (make-string-output-stream))
-          if (and line (streamp accum))
-            do (write-line line accum)
-          if (and (or (eq disposition 'begin) (not line))
-                  (streamp accum))
-            collect (get-output-stream-string accum)
-            and do (setq accum section
-                         have-line (and line t)))))
-
 (defun js-exports (package)
   (let ((exports nil) (new (ps-gensym)))
     (do-external-symbols (s package)
@@ -112,28 +87,37 @@
              (setf (getf exports s) s))))))
     (ps:ps* `(ps-js:return (create ,@exports)))))
 
+(defun js-target-concat ()
+  (with-output-to-string (out)
+    (loop for ((path . code) . more) :on (reverse *js-target*)
+          for path* = (or path (car (find-if #'car more)))
+          with prev-path := nil
+          if (not (equal path* prev-path))
+            do (setq prev-path path*)
+               (format out "~%/**************** ~A ****************/~%~%"
+                       path*)
+          do (format out "~A~%" code))))
+
 (defun write-js% (js-file)
   (when *js-target*
     (format *error-output*
             "~&~%; writing generated JavaScript to ~S...~%"
             (enough-namestring js-file))
-    (let ((pattern (or (ignore-errors (read-js-get-pattern js-file))
-                       '(code))))
-      (with-open-file (out js-file :direction :output :if-exists :supersede)
-        (dolist (piece pattern)
-          (case piece
-            (code (loop for ((path . code) . more) :on (reverse *js-target*)
-                        for path* = (or path (car (find-if #'car more)))
-                        with prev-path := nil
-                        if (not (equal path* prev-path))
-                          do (setq prev-path path*)
-                             (format out
-                               "~%/**************** ~A ****************/~%~%"
-                               path*)
-                        do (format out "~A~%" code)))
-            (export (princ (js-exports '#:mex) out))
-            (t (princ piece out)))
-          (terpri out))))))
+    (let ((target-code (js-target-concat))
+          (exports (js-exports '#:mex)))
+      (if (probe-file js-file)
+          (linewise-template:process-template
+              ((:file js-file :update t
+                :circumfix '("/(\\*{8,}) " " \\1/") :escape nil)
+                   :copy
+                   ((:block code)
+                        :replace :with target-code
+                        :preserve-directives t)
+                   ((:block export)
+                        :replace :with exports
+                        :preserve-directives t)))
+          (with-open-file (out js-file :direction :output)
+            (princ generated))))))
 
 (defmacro+ps lisp* (form)
   "Same as (LISP FORM), but used for its side effects rather than its

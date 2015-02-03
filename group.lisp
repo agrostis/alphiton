@@ -244,7 +244,7 @@ Lorem} {ipsum {dolor sit} amet.
 [{"t": "Lorem"},
  @ERROR IN "}" ("Hanging right brace"),
  {"t": " ipsum dolor sit amet."},
- @ERROR IN "" @EOT ("EOT occurred inside a group")
+ @ERROR IN ("" :EOT) ("EOT occurred inside a group")
 ]
 @END TEST
 |#

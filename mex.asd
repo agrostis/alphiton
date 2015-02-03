@@ -47,7 +47,8 @@
   :maintainer "Boris Smilga <boris.smilga@gmail.com>"
   :licence "BSD"
   :description "A macro processor for Web authoring" 
-  :depends-on (#:parenscript #:cl-unicode #:cl-json #:cl-ppcre)
+  :depends-on (#:linewise-template #:parenscript
+               #:cl-unicode #:cl-json #:cl-ppcre)
   :components
     ((:static-file "mex.asd")
      (:module #:patch-deps
@@ -101,7 +102,7 @@
   :author "Boris Smilga <boris.smilga@gmail.com>"
   :maintainer "Boris Smilga <boris.smilga@gmail.com>"
   :licence "BSD"
-  :depends-on (#:mex #:eos #:cl-json)
+  :depends-on (#:mex #:linewise-template #:eos #:cl-json)
   :components
     ((:module #:src
         :pathname ""

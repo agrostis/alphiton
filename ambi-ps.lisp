@@ -144,6 +144,36 @@
   "Wrapper for FORM-WITH-VAR-VALUE."
   `(form-with-var-value ,var (lambda (,var) ,form)))
 
+(defvar *standard-symbol-to-js*
+  (symbol-function 'symbol-to-js-string))
+
+(defun symbol-to-js-string (symbol &optional (mangle t))
+  (let ((name (symbol-name symbol))
+        (pkg (symbol-package symbol)))
+    (multiple-value-bind (bare-name modifier)
+        (multiple-value-bind (match regs)
+            (ppcre:scan-to-strings
+              "^([^*].*)(?:(-)|([*+%])([0-9]*))$|^\\*.*\\*$"
+              name)
+          (if match
+              (if (aref regs 0)
+                  (values (concatenate 'string
+                            (aref regs 0) (or (aref regs 3) ""))
+                          (case (aref (or (aref regs 1) (aref regs 2)) 0)
+                            (#\* #.(code-char #x033D))
+                            (#\+ #.(code-char #x031F))
+                            (#\% #.(code-char #x033E))
+                            (#\- #.(code-char #x0320))))
+                  (substitute #\_ #\- name))
+              name))
+      (let ((js-name (funcall *standard-symbol-to-js*
+                       (if pkg
+                           (intern bare-name pkg)
+                           (make-symbol bare-name))
+                       mangle)))
+        (if modifier
+            (concatenate 'string js-name (string modifier))
+            js-name)))))
 
 ;; Booleans
 
@@ -582,7 +612,8 @@
 
 (defpsmacro tablep (thing)
   "Return true iff THING is a table."
-  `(objectp ,thing))
+  (with-var-value (thing)
+    `(and ,thing (objectp ,thing))))
 
 (defun copy-table (table)
   "Make a fresh copy of TABLE."
@@ -772,7 +803,8 @@
            nil)
          ,(when super
             (let ((*super (intern (format nil "*~a" super))))
-              `(setf (@ ,*name prototype) (new (,*super)))))
+              `(setf (@ ,*name prototype) (new (,*super))
+                     (@ (@ ,*name prototype) constructor) ,*name)))
          (lisp*
           (defmethod make-struct-ps ((struct ,name))
             (let ((obj ',*name)

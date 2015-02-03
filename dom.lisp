@@ -28,10 +28,10 @@
       (and (dom-recipe-p a) (dom-recipe-p b)
            (equal (recipe-handler-name a) (recipe-handler-name b))
            (dom-equal% (recipe-data a) (recipe-data b)))
-      (and (tablep a) (tablep b)
-           (table-equal a b #'dom-equal%))
       (and (vectorp a) (vectorp b)
            (vector-equal a b #'dom-equal%))
+      (and (tablep a) (tablep b)
+           (table-equal a b #'dom-equal%))
       (equal a b)))
 
 (defun dom-p (thing)

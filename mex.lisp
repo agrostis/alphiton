@@ -57,7 +57,7 @@
                              output))))
         (parser-state-bind (:error eot)
             (get-group-contents tsrc ctx t ship)
-          (when (error-display-p eot)
+          (when (and (error-display-p eot) ship)
             (funcall ship eot ctx)))
         (if want-context
             ctx

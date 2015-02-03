@@ -340,12 +340,12 @@
       "Mathematical Operators" "Miscellaneous Symbols")
   "Category table with definitions from Unicode.")
 
-(defvar *plain-category-table*
-  #.(cat-table 0 (1- +code-point-limit+) *ccat-other*)
-  "Category table where every character is categorized as non-active
-   non-costituent other.")
-
 (ambi-ps ()
+
+  (defvar *plain-category-table*
+    (struct #.(cat-table 0 (1- +code-point-limit+) *ccat-other*))
+    "Category table where every character is categorized as non-active
+     non-costituent other.")
 
   (defvar *category-table* (struct *default-category-table*)
     "The standard initial category table.")

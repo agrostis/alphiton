@@ -192,7 +192,7 @@
                  (setf errors
                          (error-display*
                            :add-to errors
-                           :sep (tokens :chars "...")
+                           :sep (tokens% :chars "...")
                            :append sub))))))
         (make-parser-state :parser-value str :parser-error errors
                            :token-source-state tsrc+))))

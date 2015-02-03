@@ -49,6 +49,22 @@
                    out))
                (terpri out)))))
 
+(defun format-js-tests (tests)
+  (with-output-to-string (out)
+    (loop for (test-name source-file source-line
+               used-tests bindings mex json)
+            in tests
+          unless bindings
+            do (format out "~%    ~S: {~
+                            ~%        use: [~{~S~^, ~}],~
+                            ~%        mex: ~A,~
+                            ~%        reference: ~A~
+                            ~%    },~%"
+                       (ps:symbol-to-js-string test-name)
+                       (mapcar #'ps:symbol-to-js-string used-tests)
+                       (car (ps::parenscript-print mex nil))
+                       json))))
+
 (defun mex-using (used source)
   (loop for used-source :in used
         for ctx := (mex used-source t) :then (mex used-source ctx)
@@ -117,6 +133,17 @@
                   :replace :with (format-tests tests)
                   :preserve-directives t)))))
 
+(defun generate-js-tests (destination sources)
+  (let ((tests (get-test-templates sources)))
+    (format *error-output*
+            "~&~%; writing generated js tests to ~S...~%"
+            (enough-namestring destination))
+    (linewise-template:process-template
+        ((:file destination :update t :circumfix '("\\s*/(\\*{8,}) " " \\1/"))
+             :copy
+             ((:block "TESTS")
+                  :replace :with (format-js-tests tests)
+                  :preserve-directives t)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 

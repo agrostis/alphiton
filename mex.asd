@@ -82,7 +82,8 @@
                      (merge-pathnames "mex.js"
                                       (component-pathname src)))))))
 
-(defun generate-tests (destination)
+(defun generate-tests (destination
+                       &optional (generate-fn-name '#:generate-tests))
   (labels ((get-files (component)
              (typecase component
                ((or system module)
@@ -90,10 +91,10 @@
                   (mapcar #'get-files (component-children component))))
                (cl-source-file
                 (list (component-pathname component))))))
-    (let ((generate-fn (ignore-errors
-                         (find-symbol "GENERATE-TESTS"
-                                      (find-package "MEX-TEST"))))
-          (mex-files (get-files (find-system '#:mex))))
+    (let ((mex-files (get-files (find-system '#:mex)))
+          (generate-fn (ignore-errors
+                         (find-symbol (string generate-fn-name)
+                                      (find-package "MEX-TEST")))))
       (when (and generate-fn (fboundp generate-fn))
         (funcall generate-fn destination mex-files)))))
 

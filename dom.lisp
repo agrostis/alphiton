@@ -101,7 +101,7 @@
         (princ " ?>" stream))))
 
 
-;; DOM to JSON to DOM
+;; Lisp-side DOM to JSON to DOM
 
 (defun+ps dom-stack-get-root (stacks)
   "Close all open elements in the given multi-stack, and return the root
@@ -110,7 +110,7 @@
         until (stack-empty-p (element-stack stacks))
         finally (return elt)))
 
-(defgeneric dom-to-json% (dom)
+(defgeneric dom-to-json (dom)
   (:documentation "Encode DOM tree as JSON.")
   (:method ((elt dom-element))
     (json:with-object ()
@@ -119,7 +119,7 @@
       (json:as-object-member (:p)       ; P is for payload
         (json:with-array ()
           (loop for child :across (element-content elt)
-                do (json:as-array-member () (dom-to-json% child)))))))
+                do (json:as-array-member () (dom-to-json child)))))))
   (:method ((text dom-text))
     (json:with-object ()
       (json:encode-object-member :t (text-content text))))
@@ -136,12 +136,12 @@
                  (let ((datum (type-error-datum err)))
                    (if (or (token-p datum) (group-p datum))
                        (json:encode-json (input-to-string datum))
-                       (dom-to-json% datum))))))
+                       (dom-to-json datum))))))
           (json:encode-json (recipe-data recipe))))))
   (:method ((thing t))
     (json:encode-json nil)))
-        
-(defun json-to-dom% (json)
+
+(defun json-to-dom (json)
   (let ((dom-accumulator nil))
     (declare (special dom-accumulator))
     (labels ((get-dom-accumulator (keysym)
@@ -226,63 +226,129 @@
 
 ;; Lisp-side rendering
 
-(ambi-ps (nil)
-  (defvar *render-recipes* (make-table)
-    "Table mapping recipe names to functions invoked at render time.")
+(defvar *render-recipes* (make-table)
+  "Table mapping recipe names to functions invoked at render time.")
 
-  (defvar *render-stream* nil
-    "Stream for rendering DOM trees.")
+(defvar *render-stream* nil
+  "Stream for rendering DOM trees.")
 
-  (let ((re (cl-ppcre:create-scanner "(&)|(<)|(>)|(\")|(--)")))
-    (defun xml-quote (str &key ((:quot quot-p)) ((:hyphens hyphens-p)))
-      (cl-ppcre:regex-replace-all re str
-        (lambda (match amp lt gt quot hyphens)
-          (cond (amp "&amp;") (lt "&lt;") (gt "&gt;")
-                ((and quot quot-p) "&quot;")
-                ((and hyphens hyphens-p) "&#x2d;&#x2d;")
-                (t match)))
-        :simple-calls t)))
+(let ((re (cl-ppcre:create-scanner "(&)|(<)|(>)|(\")|(--)")))
+  (defun xml-quote (str &key ((:quot quot-p)) ((:hyphens hyphens-p)))
+    (cl-ppcre:regex-replace-all re str
+      (lambda (match amp lt gt quot hyphens)
+        (cond (amp "&amp;") (lt "&lt;") (gt "&gt;")
+              ((and quot quot-p) "&quot;")
+              ((and hyphens hyphens-p) "&#x2d;&#x2d;")
+              (t match)))
+      :simple-calls t)))
 
-  (defgeneric render (dom &optional stream)
-    (:documentation "Render DOM tree.")
-    (:method :around (dom &optional (stream t stream-supplied-p))
-      (let ((*render-stream*
-             (case (or (not stream-supplied-p) stream)
-               ((nil) (make-string-output-stream))
-               ((t) *standard-output*)
-               (t stream))))
-        (call-next-method dom *render-stream*)
-        (if (and stream-supplied-p (eq stream nil))
-            (get-output-stream-string *render-stream*))))
-    (:method ((elt dom-element) &optional stream)
-      (format stream "<~A" (element-name elt))
-      (when (element-attributes elt)
-        (map-table
-         (lambda (attr val)
-           (format stream " ~A=\"~A\""
-                   (ensure-string attr)
-                   (xml-quote (ensure-string val) :quot t)))
-         (element-attributes elt)))
-      (if (zerop (length (element-content elt)))
-          (format stream "/>")
-          (progn
-            (format stream ">")
-            (loop for child :across (element-content elt)
-                  do (render child stream))
-            (format stream "</~A>" (element-name elt)))))
-    (:method ((text dom-text) &optional stream)
-      (princ (xml-quote (text-content text)) stream))
-    (:method ((comment dom-comment) &optional stream)
-      (format stream "<!-- ~A -->"
-              (xml-quote (comment-content comment) :hyphens t)))
-    (:method ((recipe dom-recipe) &optional stream)
-      (let ((recipe-handler
-             (lookup (recipe-handler-name recipe) *render-recipes*)))
-        (when recipe-handler
-          (render (funcall recipe-handler (recipe-data recipe))
-                  stream))))
-    (:method ((thing t) &optional stream)
-      (princ (xml-quote (ensure-string thing)) stream)))
+(defgeneric render (dom &optional stream)
+  (:documentation "Render DOM tree.")
+  (:method :around (dom &optional (stream t stream-supplied-p))
+    (let ((*render-stream*
+           (case (or (not stream-supplied-p) stream)
+             ((nil) (make-string-output-stream))
+             ((t) *standard-output*)
+             (t stream))))
+      (call-next-method dom *render-stream*)
+      (if (and stream-supplied-p (eq stream nil))
+          (get-output-stream-string *render-stream*))))
+  (:method ((elt dom-element) &optional stream)
+    (format stream "<~A" (element-name elt))
+    (when (element-attributes elt)
+      (map-table
+       (lambda (attr val)
+         (format stream " ~A=\"~A\""
+                 (ensure-string attr)
+                 (xml-quote (ensure-string val) :quot t)))
+       (element-attributes elt)))
+    (if (zerop (length (element-content elt)))
+        (format stream "/>")
+        (progn
+          (format stream ">")
+          (loop for child :across (element-content elt)
+                do (render child stream))
+          (format stream "</~A>" (element-name elt)))))
+  (:method ((text dom-text) &optional stream)
+    (princ (xml-quote (text-content text)) stream))
+  (:method ((comment dom-comment) &optional stream)
+    (format stream "<!-- ~A -->"
+            (xml-quote (comment-content comment) :hyphens t)))
+  (:method ((recipe dom-recipe) &optional stream)
+    (let ((recipe-handler
+           (lookup (recipe-handler-name recipe) *render-recipes*)))
+      (when recipe-handler
+        (render (funcall recipe-handler (recipe-data recipe))
+                stream))))
+  (:method ((thing t) &optional stream)
+    (princ (xml-quote (ensure-string thing)) stream)))
+
+
+;; JS-side DOM to JSON to DOM
+
+(ambi-ps (*js-target*)
+
+  (defgeneric dom-to-json (dom)
+    (:method ((elt dom-element))
+      (create :e (element-name elt)
+              :a (element-attributes elt)
+              :p (dom-to-json (element-content elt))))
+    (:method ((text dom-text))
+      (create :t (text-content text)))
+    (:method ((comment dom-comment))
+      (create :c (comment-content comment)))
+    (:method ((recipe dom-recipe))
+      (create :r (recipe-handler-name recipe)
+              :d (dom-to-json (recipe-data recipe))))
+    (:method ((tok token))
+      (input-to-string tok))
+    (:method ((grp group))
+      (input-to-string grp))
+    (:method (thing)
+      (cond ((vectorp thing)
+             (loop for sub :across thing
+                   collect (dom-to-json sub)))
+            ((and thing (objectp thing))
+             (let ((json (create)))
+               (loop for (k v) :of thing
+                     do (setf (getprop json k) v))))
+            (t thing))))
+
+  (defun json-to-dom (json)
+    (cond
+      ((vectorp json)
+       (loop for sub :across json
+             if (null sub)
+               collect sub
+             else
+               do (setf sub (json-to-dom sub))
+               and if (null sub) return nil
+                   else collect sub))
+      ((tablep json)
+       (with-slots ((elt-name :e) (attrs :a) (content :p)
+                    (text :t) (comment :c)
+                    (recipe-handler :r) (recipe-data :d))
+           json
+         (cond
+           ((and (stringp elt-name)
+                 (and attrs (objectp attrs))
+                 (loop for attr of attrs
+                       when (and ((@ attrs has-own-property) attr)
+                                 (not (stringp (getprop attrs attr))))
+                         do (return nil)
+                       finally (return true)))
+            (let ((dom-content (json-to-dom content)))
+              (when dom-content
+                (make-dom-element :name elt-name :attributes attrs
+                                  :content dom-content))))
+           ((stringp text)
+            (make-dom-text :content text))
+           ((stringp comment)
+            (make-dom-comment :content comment))
+           ((stringp recipe-handler)
+            (make-dom-recipe :handler-name recipe-handler
+                             :data recipe-data)))))))
+
 )
 
 ;; JS-side rendering

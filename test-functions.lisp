@@ -43,7 +43,7 @@
                                     `(let ,bindings ,mex-call-0)
                                     mex-call-0))
                       (json-call `(funcall *dom-root-wrapper*
-                                           (json-to-dom% ,$json))))
+                                           (json-to-dom ,$json))))
                  (pprint-for-test
                    `(test ,test-name (is (dom-equal% ,json-call ,mex-call)))
                    out))
@@ -63,7 +63,7 @@
             eotp t))
     (with-output-to-string (out)
       (let ((json:*json-output* out))
-        (dom-to-json%
+        (dom-to-json
           (funcall *dom-error-wrapper*
             input eotp (coerce messages 'vector)
             (format nil "MexError~A" counter)))))))

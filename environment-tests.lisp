@@ -55,7 +55,7 @@
   ;; random.
   (let ((rct (rand-category-table))
         (noise (rand-string 10240)))
-    (let ((*root-context* (mex::spawn-context *root-context*
+    (let ((*root-context* (mex::spawn-context (mex::init-root-context)
                             :category-table rct)))
       (is-true (trap-errors (:rand-string noise :rand-ccat rct)
                  (mex noise) t)))))
@@ -63,6 +63,7 @@
 (let ((standard-command-tokens nil))
   (defun rand-standard-command-token ()
     (when (null standard-command-tokens)
+      (mex::init-root-context)
       (setf standard-command-tokens
               (concatenate 'vector
                 (loop for k :being each hash-key
@@ -83,3 +84,15 @@
                       (rand-standard-command-token)
                       (string c))))))
     (is-true (trap-errors (:rand-string soup) (mex soup) t))))
+
+(test simple-builtin
+  (is-true
+    (let ((plist nil))
+      (mex "\\setp{foo}{one}\\setp{bar}{two}"
+           (simple-builtins-table
+             (setp (ind val)
+               (setf (getf plist (intern (string-upcase ind) '#:keyword))
+                     val)
+               nil)))
+      (and (equal (getf plist :foo) "one")
+           (equal (getf plist :bar) "two")))))

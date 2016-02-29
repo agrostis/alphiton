@@ -67,7 +67,7 @@
 
 (defun mex-using (used source)
   (loop for used-source :in used
-        for ctx := (mex used-source t) :then (mex used-source ctx)
+        for ctx := (mex used-source nil t) :then (mex used-source nil ctx)
         finally (let ((*root-context* ctx))
                   (return (mex source)))))
 

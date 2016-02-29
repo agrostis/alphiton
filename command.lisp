@@ -987,6 +987,108 @@
   `(let (,@(match-pattern-vars pattern))
      (if (match-setf ,pattern ,token-source ,context) ,seq ,alt)))
 
+(defmacro define-simple-builtin (name (&rest vars) &body body)
+  (assert (loop for x :in vars
+                never (or (not (symbolp x)) (null x) (keywordp x)
+                          (member x lambda-list-keywords))))
+  (assert (loop for x :in body
+                never (or (eq x :patter) (eq x :handler))))
+  (with-ps-gensyms (match ctx disp tsrc)
+    `(defbuiltin ,name (,@vars :match ,match :token-source ,tsrc
+                        :context ,ctx :dispatching ,disp)
+       :pattern
+       (match-setf-and-yield ,(loop for var :in vars
+                                    collect `(,var group* #'group-p))
+         ,match ,ctx)
+       :handler
+       (handler-case
+           (handle-simple-builtin
+             (lambda ,vars ,@body)
+             (list ,@(loop for var :in vars
+                           collect `(input-to-string ,var)))
+             ,tsrc ,ctx)
+         (serious-condition (c)
+           (handle-internal-error (princ-to-string c) ,tsrc ,ctx ,disp))))))
+
+(defmacro simple-builtins-table (&rest bindings)
+  `(let ((*command-table* (copy-table (command-table (init-root-context)))))
+     ,@(loop for binding :in bindings
+             collect `(define-simple-builtin ,@binding))
+     *command-table*))
+
+(defpsfun function-to-simple-builtin (fn)
+  (let ((arity (length fn)))
+    (make-builtin 
+      :pattern (lambda (match ctx)
+                 (loop repeat arity with g := nil with dml := 0
+                       with tsrc := (token-source-state match)
+                       with pv := (parser-value match)
+                       if (match-setf ((g group #'group-p)) tsrc ctx dml)
+                         collect g :into args
+                       else
+                         return nil
+                       finally
+                         (let ((pvc (builtin-curry-handler pv args)))
+                           (setf (token-source-state match) tsrc
+                                 (parser-value match) pvc)
+                           (incf (match-length match) dml)
+                           (return match))))
+      :handler (lambda (match ctx ship args)
+                 (let ((args* (loop for arg in args
+                                collect (input-to-string arg)))
+                       (tsrc (token-source-state match))
+                       (disp (dispatching-token match)))
+                   (try (handle-simple-builtin fn args* tsrc ctx)
+                     (:catch (e)
+                       (let ((msg (ensure-string e)))
+                         (handle-internal-error msg tsrc ctx disp)))))))))
+
+(defun ensure-command-table (table)
+  (let ((command-table (make-table)))
+    (map-table
+      (lambda (prop val)
+        (assert (and (vectorp val) (every #'command-p val)))
+        (remember prop command-table val))
+      table)
+    command-table))
+
+(defpsfun ensure-command-table (table)
+  (let ((command-table (make-table)))
+    (map-table
+      (lambda (prop val)
+        (cond
+          ((functionp val)
+           (remember prop command-table
+                     (vector (function-to-simple-builtin val))))
+          ((and (vectorp val)
+                (loop for elt :in val
+                      if (not (command-p val)) return nil
+                      finally (return t)))
+           (remember prop command-table val))
+          (t (throw
+               (interpolate
+                 "Not a command vector or function: #val")))))
+      table)
+    command-table))
+
+(defun+ps handle-simple-builtin (fn args tsrc ctx)
+  (let ((ret (apply fn args)))
+    (when ret
+      (put-data (if (string-designator-p ret)
+                    (string-to-input (string ret) ctx)
+                    ret)
+                ctx))
+    (parser-expansion-state tsrc t)))
+
+(defun+ps handle-internal-error (msg tsrc ctx dispatching)
+  (parser-error-state tsrc
+    (make-error-display
+      :faulty-input dispatching
+      :message (vector-add
+                 (struct (lisp (tokens* :command "internalError" :char #\{)))
+                 (string-to-input msg ctx)
+                 (struct (lisp (tokens* :char #\})))))))
+
 
 ;;; Local Variables: ***
 ;;; mode:lisp ***

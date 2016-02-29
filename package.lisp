@@ -11,6 +11,8 @@
            #:*prologue*
            ;; Tokens and groups
            #:tokens% #:data-to-input
+           ;; Simple builtins
+           #:define-simple-builtin #:simple-builtins-table
            ;; DOM construction
            #:make-dom-element #:element-name #:element-content
            #:make-dom-attribute #:attribute-name #:attribute-value

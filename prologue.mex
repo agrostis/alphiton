@@ -29,6 +29,7 @@
 \lcdef\errmsg\extraConditionalBranch{Extra branch after \backslash else\
                in conditional}
 \lcdef\errmsg\hangingRbrace{Hanging right brace}
+\lcdef\errmsg\internalError#M{Internal error in builtin expansion: #M}
 \lcdef\errmsg\invalidLocale{Invalid locale id}
 \lcdef\errmsg\invalidStep{Invalid iteration step value}
 \lcdef\errmsg\missingCondition{Missing \backslash elsif... \

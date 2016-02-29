@@ -24,13 +24,15 @@
                     (get-group-contents tsrc ctx t nil) 
                     ctx)))))
 
-  (defun mex (source &optional want-context)
+  (defun mex (source &optional builtins want-context)
     (init-root-context)
     (with-capacity-guards ()
       (let* ((ctx (if (context-p want-context)
                       want-context
                       (guarded-make-opaque-context
                         :category-table *category-table*
+                        :command-table (when builtins
+                                         (ensure-command-table builtins))
                         :parent-context *root-context*)))
              (tsrc (make-token-source
                      :char-source source
@@ -55,6 +57,8 @@
                      (format *trace-output*
                              "~&******** Shipping ~S ********~%"
                              output))))
+        (unless (eq (command-table *root-context*) *command-table*)
+          (setf (command-table ctx) (copy-table *command-table*)))
         (parser-state-bind (:error eot)
             (get-group-contents tsrc ctx t ship)
           (when (and (error-display-p eot) ship)

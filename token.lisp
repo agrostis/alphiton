@@ -97,7 +97,9 @@
                         ,@(opt args* :replace-input nil nil)
                         ,@(opt args* :sep nil nil))))
           `(make-error-display
-             :message (vector ,(tokens** :command (car args)))
+             :message (vector ,(if (atom (car args))
+                                   (tokens** :command (car args))
+                                   (apply #'tokens** (car args))))
              :faulty-input ,(arg-vector (cdr args))))))
 
   (defun faulty-input-first (error-display)

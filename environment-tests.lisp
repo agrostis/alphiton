@@ -6,10 +6,12 @@
   `(test ,name
      (macrolet ((trap-errors ((&rest plist) &rest forms)
                   (let ((name ',name))
-                    `(multiple-value-bind (ret exc) (ignore-errors ,@forms)
+                    `(multiple-value-bind (ret exc)
+                         (ignore-errors
+                           ,@(loop for (i var) on plist by #'cddr
+                                   collect `(setf (get ',name ,i) ,var))
+                           ,@forms)
                        (setf (get ',name :exception) exc)
-                       ,@(loop for (i var) on plist by #'cddr
-                               collect `(setf (get ',name ,i) ,var))
                        ret))))
        ,@body)))
 

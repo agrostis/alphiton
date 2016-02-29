@@ -84,7 +84,8 @@
              (setf (getf exports `(get ,s)) s)
              (setf (getf exports `(set ,s ,new)) `(setf ,s ,new)))
             ((fboundp s)
-             (setf (getf exports s) s))))))
+             (unless (macro-function s)
+               (setf (getf exports s) s)))))))
     (ps:ps* `(ps-js:return (create ,@exports)))))
 
 (defun js-target-concat ()
@@ -277,6 +278,14 @@
    as strings, so no conversion is needed)."
   symbol-or-char)
 
+(defun string-designator-p (thing)
+  "Return true iff THING is a valid argument to STRING."
+  (or (stringp thing) (symbolp thing) (characterp thing)))
+
+(defpsmacro string-designator-p (thing)
+  "Return true iff THING is a valid argument to STRING."
+  `(stringp ,thing))
+
 (defun ensure-string (thing)
   "Coerce THING (normally, a vector of characters) to string."
   (or (ignore-errors (coerce thing 'string))
@@ -293,6 +302,7 @@
   (cond
     ((stringp thing) thing)
     ((vectorp thing) ((@ thing join) ""))
+    ((null thing) "")
     (t ((@ thing to-string)))))
 
 (defun upcase (string-or-char)
@@ -620,7 +630,7 @@
   (loop with copy := (make-hash-table :test #'equal)
         for key :being each hash-key of table :using (hash-value datum)
         do (setf (gethash key copy) datum)
-        finally (return table)))
+        finally (return copy)))
 
 (defpsmacro copy-table (table)
   "Make a fresh copy of TABLE."

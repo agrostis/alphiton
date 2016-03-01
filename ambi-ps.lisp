@@ -603,7 +603,8 @@
     new-stack))
 
 
-;; Lookup tables, implemented as hash tables in Lisp, as objects in JS.
+;; Lookup tables, implemented as hash tables (with partial support for
+;; alists and plists) in Lisp, as objects in JS.
 
 (defun make-table (&rest data)
   "Create a new lookup table and initialize it with DATA."
@@ -616,9 +617,15 @@
   "Create a new lookup table and initialize it with DATA."
   `(create ,@data))
 
+(defun alistp (thing)
+  (and (listp thing) (consp (car thing))))
+
+(defun plistp (thing)
+  (and (listp thing) (string-designator-p (car thing))))
+
 (defun tablep (thing)
   "Return true iff THING is a table."
-  (hash-table-p thing))
+  (or (hash-table-p thing) (alistp thing) (plistp thing)))
 
 (defpsmacro tablep (thing)
   "Return true iff THING is a table."
@@ -627,10 +634,10 @@
 
 (defun copy-table (table)
   "Make a fresh copy of TABLE."
-  (loop with copy := (make-hash-table :test #'equal)
-        for key :being each hash-key of table :using (hash-value datum)
-        do (setf (gethash key copy) datum)
-        finally (return copy)))
+  (let ((copy (make-hash-table :test #'equal)))
+    (map-table #'(lambda (key datum) (setf (gethash key copy) datum))
+               table)
+    copy))
 
 (defpsmacro copy-table (table)
   "Make a fresh copy of TABLE."
@@ -639,7 +646,15 @@
 (defun lookup (key table &optional (default nil))
   "Look up KEY in TABLE and return the corresponding value, or DEFAULT if
    KEY is not defined."
-  (gethash key table default))
+  (etypecase table
+    (hash-table
+     (gethash key table default))
+    ((satisfies alistp)
+     (let ((a (assoc key table :test #'equal)))
+       (if a (cdr a) default)))
+    ((satisfies plistp)
+     (let ((m (member key table :test #'equal)))
+       (if (and m (cdr m)) (cadr m) default)))))
 
 (defpsmacro lookup (key table &optional (default nil defaultp))
   "Look up KEY in TABLE and return the corresponding value, or DEFAULT if
@@ -651,7 +666,9 @@
 
 (defun remember (key table value)
   "Associate KEY with VALUE in TABLE."
-  (setf (gethash key table) value))
+  (etypecase table
+    (hash-table
+     (setf (gethash key table) value))))
 
 (defpsmacro remember (key table value)
   "Associate KEY with VALUE in TABLE."
@@ -659,7 +676,9 @@
 
 (defun forget (key table)
   "Remove KEY with its associated value from TABLE."
-  (remhash key table))
+  (etypecase table
+    (hash-table
+     (remhash key table))))
 
 (defpsmacro forget (key table)
   "Remove KEY with its associated value from TABLE."
@@ -669,11 +688,17 @@
   "Return true iff the tables A and B have the same number of entries, and
    every pair of entries with equal keys in A and B store values which are
    the same under TEST-FN."
-  (and (= (hash-table-count a) (hash-table-count b))
-       (loop for k :being each hash-key :of a
-             using (hash-value va)
-             always (multiple-value-bind (vb b-has-k) (gethash k b)
-                      (and b-has-k (funcall test-fn va vb))))))
+  (etypecase a
+    (hash-table
+     (and (hash-table-p b)
+          (= (hash-table-count a) (hash-table-count b))
+          (loop for k :being each hash-key :of a
+                using (hash-value va)
+                always (multiple-value-bind (vb b-has-k) (gethash k b)
+                         (and b-has-k (funcall test-fn va vb))))))
+    ((or (satisfies alistp) (satisfies plistp))
+     (table-equal (copy-table a) (if (hash-table-p b) b (copy-table b))
+                  test-fn))))
 
 (defpsfun table-equal (a b test-fn)
   "Return true iff the tables A and B have the same number of entries, and
@@ -693,7 +718,15 @@
 
 (defun map-table (fn table)
   "Map function FN over the entries in TABLE."
-  (maphash fn table))
+  (etypecase table
+    (hash-table
+     (maphash fn table))
+    ((satisfies alistp)
+     (loop for (key . datum) :in table
+           do (funcall fn key datum)))
+    ((satisfies plistp)
+     (loop for (key datum) :on table :by #'cddr
+           do (funcall fn key datum)))))
 
 (defpsfun map-table (fn table)
   "Map function FN over the entries in TABLE."

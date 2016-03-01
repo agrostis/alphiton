@@ -19,6 +19,7 @@
            #:make-dom-text #:text-content
            #:make-dom-comment #:comment-content
            #:make-dom-recipe #:recipe-handler-name #:recipe-data
+           #:element #:text-node #:recipe
            #:*dom-root-wrapper* #:*dom-error-wrapper*
            #:dom-to-json #:json-to-dom #:dom-equal #:dom-equal%
            #:*render-recipes* #:render))

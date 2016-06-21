@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Error displays
 
@@ -524,7 +524,7 @@
 
   (defun char-token-at (source position context c cat)
     (declare (ignore source))
-    "Parse (really not) SOURCE at POSITION for a character token."   
+    "Parse (really not) SOURCE at POSITION for a character token."
     (guarded-make-char-token :start position :end (1+ position)
                              :category cat :chr c :context context))
 
@@ -679,7 +679,7 @@
 
   (defstruct (token-source (:conc-name))
     "A structure to keep track of tokens read and about to be read.
-     In a primary source, CHAR-SOURCE is the string with Mex text to
+     In a primary source, CHAR-SOURCE is the string with Alphiton text to
      process, CHAR-SOURCE-OFFSET is the position in the string at which the
      next token is to be read (as by TOKEN-AT), and CACHED-CAT-TABLE is the
      category table which was used to parse the last token read.
@@ -690,7 +690,7 @@
      cache, and at which tokens in an expansion source are to be retrieved.
      PARENT-SOURCE is the token source which should be used after the
      current source runs out of tokens.  EXPANSION-CONTEXT is a context for
-     macro parameters (cf. function MEX-DISPATCH in command.lisp)."
+     macro parameters (cf. function ALPHITON-DISPATCH in command.lisp)."
     char-source char-source-offset cached-tokens cached-token-offset
     cached-cat-table parent-source expansion-context)
 
@@ -918,7 +918,7 @@
 
 #|
 @BEGIN TEST TOKENS-ONLY
-@MEX ((MEX::*UNEXPANDABLE* T))
+@ALPHITON ((ALPHITON::*UNEXPANDABLE* T))
 Lorem ipsum ##
 dolor\
    sit \amet.
@@ -927,7 +927,7 @@ dolor\
 @END TEST
 
 @BEGIN TEST UNFINISHED-TOKEN
-@MEX
+@ALPHITON
 Lorem ipsum dolor #\
 @JSON
 [{"t": "Lorem ipsum dolor "},

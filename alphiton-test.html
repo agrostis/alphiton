@@ -1,19 +1,19 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
   <head>
-    <title>Mex</title>
+    <title>Alphiton</title>
     <style type="text/css">
       body {
         font-family: sans-serif;
         background-color: white;
       }
     </style>
-    <link href="mex.css" type="text/css" rel="stylesheet"/>
-    <script type="text/javascript" src="mex.js"></script>
+    <link href="alphiton.css" type="text/css" rel="stylesheet"/>
+    <script type="text/javascript" src="alphiton.js"></script>
     <script type="text/javascript">
     <!--
-      var MEX = makeMexInstance();
-      var MEX_TESTS = {
+      var ALPHITON = makeAlphitonInstance();
+      var ALPHITON_TESTS = {
       /**************** @BEGIN TESTS ****************/
       /**************** @END TESTS ****************/
       };
@@ -48,7 +48,7 @@
         overflow: auto;
       }
 
-      div.test .mex {
+      div.test .alphiton {
         background-color: lightsteelblue;
         width: 50%;
         max-width: 500pt;
@@ -72,40 +72,40 @@
     <script type="text/javascript">
     <!--
 
-      function addMexTestDisplay(id) {
+      function addAlphitonTestDisplay(id) {
           $('<h3/>', {'html': id}).appendTo($('#tests'));
-          var spec = MEX_TESTS[id];
+          var spec = ALPHITON_TESTS[id];
           var testblock = $('<div class="test"/>').appendTo($('#tests'));
-          testblock.append($('<div/>', {'html': $('<pre/>', {'html': spec.mex}),
-                                        'class': 'mex'}));
+          testblock.append($('<div/>', {'html': $('<pre/>', {'html': spec.alphiton}),
+                                        'class': 'alphiton'}));
           var result_dom, result, result_class;
           var reference_dom, reference, reference_class;
-          var rootContext = MEX.ROOT_CONTEXT;
+          var rootContext = ALPHITON.ROOT_CONTEXT;
           try {
               var ctx = false;
               if (spec.use.length > 0) {
                   ctx = true;
                   for (var i = 0; i < spec.use.length; ++i) {
-                      ctx = MEX.mex(MEX_TESTS[spec.use[i]].mex, ctx);
+                      ctx = ALPHITON.alphiton(ALPHITON_TESTS[spec.use[i]].alphiton, ctx);
                   }
-                  MEX.ROOT_CONTEXT = ctx;
+                  ALPHITON.ROOT_CONTEXT = ctx;
               }
-              result_dom = MEX.mex(spec.mex);
-              result = MEX.render(result_dom, document);
+              result_dom = ALPHITON.alphiton(spec.alphiton);
+              result = ALPHITON.render(result_dom, document);
               result_class = 'ok';
           } catch (e) {
               result = $('<pre/>', {'html': 'Caught error: ' + e});
               result_class = 'error';
           }
           try {
-              reference_dom = MEX.DOM_ROOT_WRAPPER(MEX.jsonToDom(spec.reference));
-              reference = MEX.render(reference_dom, document);
-              reference_class = MEX.domEqual(result_dom, reference_dom) ? 'ok' : 'error';
+              reference_dom = ALPHITON.DOM_ROOT_WRAPPER(ALPHITON.jsonToDom(spec.reference));
+              reference = ALPHITON.render(reference_dom, document);
+              reference_class = ALPHITON.domEqual(result_dom, reference_dom) ? 'ok' : 'error';
           } catch (e) {
               reference = $('<pre/>', {'html': 'Caught error: ' + e});
               reference_class = 'error';
           }
-          MEX.ROOT_CONTEXT = rootContext;
+          ALPHITON.ROOT_CONTEXT = rootContext;
           testblock.append($('<div/>', {'html': result,
                                         'class': 'result ' + result_class}));
           testblock.append($('<div/>', {'html': reference,
@@ -113,14 +113,14 @@
       }
 
       $(document).ready(function() {
-          $.each(MEX_TESTS, addMexTestDisplay);
+          $.each(ALPHITON_TESTS, addAlphitonTestDisplay);
       });
 
     -->
     </script>
   </head>
   <body>
-  <h2>Welcome to Mex!</h2>
+  <h2>Welcome to Alphiton!</h2>
   <div id="tests"></div>
   </body>
 </html>

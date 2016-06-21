@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Character category tables
 
@@ -80,7 +80,7 @@
       (loop with i := 0 while (< i (length tables))
             with left-start := nil with left-end := nil
             with left-edge := nil with right-edge := nil
-            with body-start := nil with body-end := nil 
+            with body-start := nil with body-end := nil
             with right-start := nil with right-end := (length tables)
             with state := :left
             do (let* ((tbl (aref tables i))
@@ -209,9 +209,9 @@
 
   ;; The default category table shall be built from Unicode data.
 
-  (defun unicode-cat-to-mex-cat (cat)
+  (defun unicode-cat-to-alphiton-cat (cat)
     "Take a Unicode category descriptor (such as \"Mc\" for Spacing
-     Combining Mark), and return a Mex category number."
+     Combining Mark), and return an Alphiton category number."
     (let* ((cat* (if (and (stringp cat) (= (length cat) 2)) cat "Cn"))
            (cat0 (aref cat* 0))
            (cat1 (aref cat* 1)))
@@ -225,8 +225,8 @@
                    *ccat-other*))
         (t *ccat-invalid*))))
 
-  (defun exceptional-mex-cat (c)
-    "For some characters that have special meanings in Mex, return the
+  (defun exceptional-alphiton-cat (c)
+    "For some characters that have special meanings in Alphiton, return the
      respective category numbers."
     (case c
       ((#.(code-char 9))                      ; Tab
@@ -274,7 +274,7 @@
     "Take a Unicode block name and return a category table specifying the
      categories for all characters in that block."
     (format *error-output*
-            "~&; preparing MEX category data in Unicode block ~A...~%"
+            "~&; preparing Alphiton category data in Unicode block ~A...~%"
             block-name)
     (finish-output *error-output*)
     (let ((block-chars (list-all-characters
@@ -282,8 +282,8 @@
       (loop with cats := '()
             for c :in block-chars
             for code := (char-code c)
-            for cat := (or (exceptional-mex-cat c)
-                           (unicode-cat-to-mex-cat (general-category c)))
+            for cat := (or (exceptional-alphiton-cat c)
+                           (unicode-cat-to-alphiton-cat (general-category c)))
             minimize code :into minc
             maximize code :into maxc
             do (incf (getf cats cat 0))
@@ -312,7 +312,7 @@
     (let ((block-tables (sort (mapcar #'cat-table-unicode-block-spec
                                       (or blocks (code-blocks)))
                               #'< :key #'min-char)))
-      (format *error-output* "~&; optimizing MEX category data...~%")
+      (format *error-output* "~&; optimizing Alphiton category data...~%")
       (cat-table
        0 (1- +code-point-limit+) *ccat-invalid*
        (reduce

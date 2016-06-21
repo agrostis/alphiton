@@ -1,10 +1,10 @@
 (in-package #:cl-user)
 
-(defpackage #:mex-test 
-  (:use #:cl #:mex #:eos)
+(defpackage #:alphiton-test
+  (:use #:cl #:alphiton #:eos)
   (:export #:run-tests))
 
-(in-package #:mex-test)
+(in-package #:alphiton-test)
 
 (defun pprint-for-test (expr out)
   (let ((*print-pretty* t))
@@ -16,60 +16,63 @@
       (t (write expr :stream out)))))
 
 (defun format-tests (tests)
-  (let ((*package* (find-package '#:mex-test)))
+  (let ((*package* (find-package '#:alphiton-test)))
     (with-output-to-string (out)
       (loop initially (terpri out)
             for (test-name source-file source-line
-                 used-tests bindings mex json)
+                 used-tests bindings alphiton json)
               in tests
             with history
-            for $mex := (gentemp "_MEX_")
+            for $alphiton := (gentemp "_ALPHITON_")
             for $json := (gentemp "_JSON_")
             for $$used :=
               (loop for name :in used-tests
-                    for $mex := (second (assoc name history))
-                    if $mex collect $mex)
-            do (push (list test-name $mex $json) history)
+                    for $alphiton := (second (assoc name history))
+                    if $alphiton collect $alphiton)
+            do (push (list test-name $alphiton $json) history)
                (format out "~&;;; @TEST ~A [~A:~A]~%~%"
                        test-name source-file source-line)
-               (pprint-for-test `(defparameter ,$mex ,mex) out)
+               (pprint-for-test `(defparameter ,$alphiton ,alphiton) out)
                (terpri out)
                (pprint-for-test `(defparameter ,$json ,json) out)
                (terpri out)
-               (let* ((mex-call-0 (if $$used
-                                      `(mex-using (list ,@$$used) ,$mex)
-                                      `(mex ,$mex)))
-                      (mex-call (if bindings
-                                    `(let ,bindings ,mex-call-0)
-                                    mex-call-0))
+               (let* ((alphiton-call-0 (if $$used
+                                           `(alphiton-using (list ,@$$used)
+                                                            ,$alphiton)
+                                           `(alphiton ,$alphiton)))
+                      (alphiton-call (if bindings
+                                    `(let ,bindings ,alphiton-call-0)
+                                    alphiton-call-0))
                       (json-call `(funcall *dom-root-wrapper*
                                            (json-to-dom ,$json))))
                  (pprint-for-test
-                   `(test ,test-name (is (dom-equal% ,json-call ,mex-call)))
+                   `(test ,test-name
+                          (is (dom-equal% ,json-call ,alphiton-call)))
                    out))
                (terpri out)))))
 
 (defun format-js-tests (tests)
   (with-output-to-string (out)
     (loop for (test-name source-file source-line
-               used-tests bindings mex json)
+               used-tests bindings alphiton json)
             in tests
           unless bindings
             do (format out "~%    ~S: {~
                             ~%        use: [~{~S~^, ~}],~
-                            ~%        mex: ~A,~
+                            ~%        alphiton: ~A,~
                             ~%        reference: ~A~
                             ~%    },~%"
                        (ps:symbol-to-js-string test-name)
                        (mapcar #'ps:symbol-to-js-string used-tests)
-                       (car (ps::parenscript-print mex nil))
+                       (car (ps::parenscript-print alphiton nil))
                        json))))
 
-(defun mex-using (used source)
+(defun alphiton-using (used source)
   (loop for used-source :in used
-        for ctx := (mex used-source nil t) :then (mex used-source nil ctx)
+        for ctx := (alphiton used-source nil t)
+                :then (alphiton used-source nil ctx)
         finally (let ((*root-context* ctx))
-                  (return (mex source)))))
+                  (return (alphiton source)))))
 
 (defun format-as-error-json (input messages counter)
   (assert (every #'stringp messages))
@@ -82,7 +85,7 @@
         (dom-to-json
           (funcall *dom-error-wrapper*
             input eotp (coerce messages 'vector)
-            (format nil "MexError~A" counter)))))))
+            (format nil "AlphitonError~A" counter)))))))
 
 (defun get-test-templates (sources)
   (let ((tests nil))
@@ -93,7 +96,7 @@
         ((:files sources :circumfix '("\\s*" "\\s*"))
              :discard
              ((:block "TEST" test-name
-                      &aux used-tests bindings mex json
+                      &aux used-tests bindings alphiton json
                            (source-file
                             (file-namestring
                               (pathname linewise-template:*source-stream*)))
@@ -101,16 +104,16 @@
                             linewise-template:*source-line-count*)
                            (error-counter -1))
                   :discard
-                  :do (flet ((mt (s) (intern (string s) '#:mex-test))
+                  :do (flet ((mt (s) (intern (string s) '#:alphiton-test))
                              (rt (s) (cl-ppcre:regex-replace "\\n$" s "")))
                         (push (list (mt test-name) source-file source-line
                                     (mapcar #'mt used-tests)
-                                    bindings (rt mex) (rt json))
+                                    bindings (rt alphiton) (rt json))
                               tests))
                   ((:atomic "USE" used-test)
                        :discard :do (push used-test used-tests))
-                  ((:after "MEX" &optional bndngs)
-                       :copy :to (:var mex) :do (setq bindings bndngs))
+                  ((:after "ALPHITON" &optional bndngs)
+                       :copy :to (:var alphiton) :do (setq bindings bndngs))
                   ((:after "JSON")
                        :copy :to (:var json)
                        ((:atomic "ERROR IN" input messages &trailer trlr)
@@ -147,8 +150,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def-suite mex-tests)
+(def-suite alphiton-tests)
 
 (defun run-tests ()
-  (format t "Running Mex tests:~&")
-  (run! 'mex-tests))
+  (format t "Running Alphiton tests:~&")
+  (run! 'alphiton-tests))

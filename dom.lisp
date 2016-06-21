@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;; Equality of DOM objects
 
@@ -216,7 +216,7 @@
                       (setf dom-accumulator :fail
                             json:*object-value-handler* valh)))
                 (funcall keyh key))
-            :end-of-object 
+            :end-of-object
               (lambda ()
                 (if (typep dom-accumulator 'structure-object)
                     dom-accumulator

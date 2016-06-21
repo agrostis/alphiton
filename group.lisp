@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Groups
 
@@ -23,7 +23,7 @@
           for str := sub-str :then (concatenate 'string str sub-str)
           finally (return str)))
 
-  (declaim (ftype function get-group-contents mex-dispatch))
+  (declaim (ftype function get-group-contents alphiton-dispatch))
 
   (defvar *group-end-p* #'eot-p
     "Signifier for a predicate function which returns true iff its (single)
@@ -130,7 +130,7 @@
           ;; Expand the expandable, ship the unexpandable (or add it
           ;; to group contents).
           unless noexpand
-            do (let ((pstate (mex-dispatch sub token-source context ship)))
+            do (let ((pstate (alphiton-dispatch sub token-source context ship)))
                  (setf expanded (parser-value pstate)
                        token-source (token-source-state pstate)))
           unless expanded
@@ -231,14 +231,14 @@
 
 #|
 @BEGIN TEST GROUPS-ONLY
-@MEX
+@ALPHITON
 Lorem {ipsum {dolor sit}} amet.
 @JSON
 {"t": "Lorem ipsum dolor sit amet."}
 @END TEST
 
 @BEGIN TEST UNBALANCED-GROUPS
-@MEX
+@ALPHITON
 Lorem} {ipsum {dolor sit} amet.
 @JSON
 [{"t": "Lorem"},

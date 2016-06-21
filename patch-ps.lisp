@@ -9,7 +9,7 @@
 ;;; commit 5ca828dcc0aa43c0a52b17a3eaad05c44b1cbb12
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Wed Oct 17 02:09:26 2012 +0400
-;;; 
+;;;
 ;;;     Method functions should be applied to their host objects as thisArgs, rather than to the callers' this.
 
 (defpsmacro apply (fn &rest args)
@@ -29,7 +29,7 @@
 ;;; commit 0cb1d2def80a1ee4f3017aff13610acc07899990
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Tue Nov 13 19:40:45 2012 +0400
-;;; 
+;;;
 ;;;     Lisp-like initialization options for MAKE-ARRAY.
 
 (defpsmacro make-array (&rest args)
@@ -56,7 +56,7 @@
 ;;; commit 5b1fa4344453b0dc668f3df7c95b97a02dc17074
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Wed Oct 1 00:46:10 2014 +0400
-;;; 
+;;;
 ;;;     Fixed: RETURN-FROM a nested block in tail context should behave as RETURN-FROM the outer block.
 
 (defun expressionize-result (tag form)
@@ -139,7 +139,7 @@ Parenscript now implements implicit return, update your code! Things like (lambd
 ;;; commit 1a7617548a228020cbe75375223f6e693f56935f
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Thu Dec 18 15:05:36 2014 +0300
-;;; 
+;;;
 ;;;     Fixed: empty-body clauses in COND should evaluate to the result of the test.
 
 (define-expression-operator cond (&rest clauses)
@@ -189,7 +189,7 @@ Parenscript now implements implicit return, update your code! Things like (lambd
 ;;; commit cd81a4dfc247b44db29f03d98b63a0ed55d17111
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Mon Dec 15 21:59:55 2014 +0300
-;;; 
+;;;
 ;;;     Added support for getters and setters in object literals.
 
 (export 'ps-js::set '#:ps-js)
@@ -279,7 +279,7 @@ Parenscript now implements implicit return, update your code! Things like (lambd
 ;;; 4cf5031602fdca26792574d0a2d86f85a3a9852a
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Thu Dec 25 22:35:44 2014 +0300
-;;; 
+;;;
 ;;;     Improved handling of declarations.
 
 (defmacro with-declaration-effects ((var block) &body body)
@@ -549,7 +549,7 @@ Parenscript now implements implicit return, update your code! Things like (lambd
 ;;; commit dcf452393bf51285b41f2439f049988d6f1ad74e
 ;;; Author: Boris Smilga <boris.smilga@gmail.com>
 ;;; Date:   Sun Jan 4 15:25:57 2015 +0300
-;;; 
+;;;
 ;;;     Fixed unparenthesized comma-sequences in for(;;) variable initializer expressions inside blocks.
 
 (defprinter ps-js:for (vars tests steps body-block)

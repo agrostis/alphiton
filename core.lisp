@@ -1,6 +1,6 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
-;;; Core Mex builtins
+;;; Core Alphiton builtins
 
 (ambi-ps ()
 
@@ -25,7 +25,7 @@
 
 #|
 @BEGIN TEST COMMENT
-@MEX
+@ALPHITON
 \comment: This is a comment
 \setcat+\active% \def%{\comment}
 % Now, this too is a comment
@@ -47,7 +47,7 @@
         match ctx)
     :handler
     (parser-state-bind (:value expd :error error :token-source tsrc+)
-        (mex-dispatch tok2 (token-source-state match) ctx nil)
+        (alphiton-dispatch tok2 (token-source-state match) ctx nil)
       (if error
           (parser-error-state* tsrc+
             :add-to error :prepend-input dispatching tok1)
@@ -81,7 +81,7 @@
      but whose native context is the global (top-level) context."
     :pattern
     (match-setf-and-yield ((tok token #'non-eot-token-p)) match ctx)
-    :handler 
+    :handler
     (let ((global-ctx
            (loop for octx := (ensure-opaque-context ctx)
                           :then (parent-context octx)
@@ -124,7 +124,7 @@
 
 #|
 @BEGIN TEST REPLACE-CONTEXT
-@MEX
+@ALPHITON
 \def\loc{outer} {\def\loc{middle} {\def\loc{inner}
 \loc{} vs. \global\loc{} vs. \parent\loc{} vs. \parent\parent\loc{}}}
 @JSON
@@ -132,7 +132,7 @@
 @END TEST
 
 @BEGIN TEST REPLACE-CONTEXT-FOR-DEF
-@MEX
+@ALPHITON
 \def\loc{outer}
 {\def\loc{inner} \global\def\getloc{\loc}
 \global\def\redefloc{\local\def\loc{\loc}}}
@@ -185,7 +185,7 @@
 
 #|
 @BEGIN TEST MULTILANG
-@MEX
+@ALPHITON
 \setcat\letter+\constituent é
 \newlang{fr_FR}\lcdef\bonté{Toute autre science est dommageable à celui qui n'a pas la science de la bonté.}
 \newlang{ru_RU}\lcdef\bonté{Тому, кто не постиг науки добра, всякая иная наука приносит лишь вред.}
@@ -240,7 +240,7 @@
 
 #|
 @BEGIN TEST CSNAME
-@MEX
+@ALPHITON
 \def\fire{char}\def\wood{coal}
 \def\charcoal{ashes}
 \csname\fire\wood\endcsname
@@ -414,7 +414,7 @@
 
 #|
 @BEGIN TEST DEF-VS-EDEF
-@MEX
+@ALPHITON
 \def\foo{outer}
 {\def\foo{inner}\parent\def\bydef{\local\foo}\parent\edef\byedef{\local\foo}}
 \bydef{} vs. \byedef{}
@@ -423,7 +423,7 @@
 @END TEST
 
 @BEGIN TEST EDEF-WITH-PARAMS
-@MEX
+@ALPHITON
 \def\deffoobar#\X#\Y{\global\edef\foo#\Y{foo: <#\X> <#\Y>}\
   \global\def\bar{bar: <#\Y>}}
 \deffoobar{one}{two}\def\Y{why?}
@@ -468,7 +468,7 @@
 
 #|
 @BEGIN TEST ALIAS
-@MEX
+@ALPHITON
 \def\foo{Foo!}
 {\alias\emansc{\noexpand\noexpand\noexpand\endcsname} \csname foo\emansc}
 {\def\emansc{\endcsname} \csname foo\emansc}
@@ -518,7 +518,7 @@
 
 #|
 @BEGIN TEST ERROR
-@MEX
+@ALPHITON
 \def\foo{Foo!}
 \error{\foo=#\foo}{Worse than a crime}
 @JSON
@@ -617,7 +617,7 @@
 
 #|
 @BEGIN TEST REPLACE-CCAT
-@MEX
+@ALPHITON
 \setcat\lbrace[\setcat\rbrace]
 [\setcat\letter+\constituent{\setcat\letter+\constituent}\def\{}[{Foo!}] \{}]
 {\setcat+\active@\global\def@{Bar!}} \chr+\active@ \carriagereturn\linefeed

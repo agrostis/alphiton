@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 
 ;;; Capacity guards
@@ -10,7 +10,7 @@
 
   (defvar *capacity-exceeded*
     (lambda (guard-name)
-      (error "Mex ~(~A~) capacity exceeded" guard-name))
+      (error "Alphiton ~(~A~) capacity exceeded" guard-name))
     "Function to call when capacity is exceeded.
      It must accept one argument, a symbol describing the capacity that was
      exceeded.  The default behvaiour is to signal an error.")
@@ -18,7 +18,7 @@
   (defpsvar *capacity-exceeded*
     (lambda (guard-name)
       (throw
-        (new (*error (interpolate "Mex #{guard-name} capacity exceeded")))))    
+        (new (*error (interpolate "Alphiton #{guard-name} capacity exceeded")))))
     "Function to call when capacity is exceeded.
      It must accept one argument, a symbol describing the capacity that was
      exceeded.  The default behvaiour is to signal an error.")
@@ -77,9 +77,9 @@
      run.")
 
   (defstruct-guarded (context (:conc-name) (:guard context))
-    "A Mex processing context, holding local customizations of character
-     categories, local bindings of commands and aliases, and register and
-     stack storage."
+    "An Alphiton processing context, holding local customizations of
+     character categories, local bindings of commands and aliases, and
+     register and stack storage."
     ;; A CAT-TABLE structure:
     category-table
     ;; A table mapping command keys (strings) to vectors of TOKENs:
@@ -225,7 +225,7 @@
                             (gethash "" (locale-table ctx) nil))
                           (table-cmd-count
                             (gethash *default-locale* (locale-table ctx)
-                                     nil))))) 
+                                     nil)))))
                 (custom-cats
                  (and (category-table ctx)
                       (not (eq (category-table ctx)

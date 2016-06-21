@@ -1,8 +1,8 @@
 (in-package #:cl-user)
 
-(defpackage #:mex
+(defpackage #:alphiton
   (:use #:cl #:ps #:cl-unicode)
-  (:export #:mex #:write-js%
+  (:export #:alphiton #:write-js%
            ;; Category tables
            #:*category-table* #:char-cat #:cat-table-from-unicode-blocks%
            #:*default-category-table* #:*plain-category-table*
@@ -24,6 +24,6 @@
            #:dom-to-json #:json-to-dom #:dom-equal #:dom-equal%
            #:*render-recipes* #:render))
 
-(defvar mex::%prologue% ""
-  "Code to run at start of Mex processing.
+(defvar alphiton::%prologue% ""
+  "Code to run at start of Alphiton processing.
    This is normally loaded by ASDF.")

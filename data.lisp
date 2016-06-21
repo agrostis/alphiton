@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Document stack and data registers
 
@@ -51,11 +51,11 @@
 
   (defvar *dom-root-wrapper*
     (lambda (&optional content)
-      (let ((elt (element "DIV" :class "mex_wrapper")))
+      (let ((elt (element "DIV" :class "alphiton_wrapper")))
         (setf (element-content elt) (ensure-vector content))
         elt))
-    "The value is a function returning a DOM-ELEMENT that Mex should put at
-     the root of the DOM multi-stack.  The function should accept one
+    "The value is a function returning a DOM-ELEMENT that Alphiton should
+     put at the root of the DOM multi-stack.  The function should accept one
      optional argument (an input or vector of inputs), but may ignore it.")
 
   (defun init-dom-stack (context)
@@ -105,7 +105,7 @@
     "A more concise DOM-RECIPE constructor syntax."
     (make-dom-recipe :handler-name handler :data data))
 
-  (defun dom-stack-next-id (stacks &optional (prefix "Mex"))
+  (defun dom-stack-next-id (stacks &optional (prefix "Alphiton"))
     "Generate and return a new id which is guaranteed to differ from all ids
      previously generated for STACKS."
     (bind/init ((n (id-counter stacks) 1))
@@ -156,7 +156,7 @@
   (defun verify-element-content (content parent-element stacks)
     "Ensure that CONTENT is valid as the content of PARENT-ELEMENT, that is:
       * merge all consecutive runs of tokens into DOM-TEXT nodes;
-      * convert error displays to their DOM-ELEMENT representations; 
+      * convert error displays to their DOM-ELEMENT representations;
       * remove everything else which is not DOM stuff.
      Return validated content as a vector of DOM-ELEMENT, DOM-TEXT,
      DOM-COMMENT and/or DOM-RECIPE data."
@@ -184,7 +184,7 @@
                          (dom-recipe-p elt))
                 do (stack-push elt validated)
               else if (error-display-p elt)
-                do (let ((id (dom-stack-next-id stacks "MexError")))
+                do (let ((id (dom-stack-next-id stacks "AlphitonError")))
                      (stack-push (error-display-to-dom elt id)
                                  validated)))
       #| TBD: verification according to document type |#
@@ -193,10 +193,10 @@
   (defvar *dom-error-wrapper*
     (lambda (input eotp messages id)
       (element "SPAN"
-        :class "mex_error_display" :id id
+        :class "alphiton_error_display" :id id
         (text-node input)
-        (when eotp (element "SPAN" :class "mex_eot"))
-        (let ((msg-elt (element "SPAN" :class "mex_error_messages")))
+        (when eotp (element "SPAN" :class "alphiton_eot"))
+        (let ((msg-elt (element "SPAN" :class "alphiton_error_messages")))
           (setf (element-content msg-elt)
                   (ensure-vector
                     (loop for msg :across messages
@@ -205,7 +205,7 @@
                             and collect (element "BR")
                           collect (element "SPAN" (text-node msg)))))
           msg-elt)))
-    "The value is a function returning a DOM-ELEMENT that Mex should
+    "The value is a function returning a DOM-ELEMENT that Alphiton should
      substitute for an ERROR-DISPLAY.  The function should accept four
      arguments: a string representing the faulty input, a boolean indicating
      whether the faulty input included an end of text, a sequence of strings
@@ -338,7 +338,7 @@
 ;                     key *put-data-callback*)
               (put-data (lookup key register-table nil) context)
               (parser-expansion-state (token-source-state match) t)))
-           (assign 
+           (assign
              (tokens% :chars "="))
            (setter
             (lambda (match context ship)
@@ -354,7 +354,7 @@
                                          (setf stored t)
                                          (remember key register-table
                                                    value))))
-                                 (mex-dispatch tok tsrc context ship)))))
+                                 (alphiton-dispatch tok tsrc context ship)))))
                 (if stored pstate
                     (parser-error-state* tsrc
                       "noData" (dispatching-token match) assign tok))))))
@@ -478,7 +478,7 @@
 
 #|
 @BEGIN TEST REGISTERS
-@MEX
+@ALPHITON
 \register\foo=\false \register\bar=\int 42 \register\baz=\token\bar
 \foo\pop ; \baz\pop\pop
 \baz=\tokens quux}\endtokens
@@ -547,7 +547,7 @@
 
 #|
 @BEGIN TEST TOKEN-COMPARISONS
-@MEX
+@ALPHITON
 \edef\foo{\backslash foo}
 \edef\bar{\backslash bar}
 \def\test#\TOKi#\TOKii{#\TOKi\if\is#\TOKi#\TOKii\then=\else≠\endif#\TOKii}
@@ -719,7 +719,7 @@
 
 #|
 @BEGIN TEST STACK-OPS-1
-@MEX
+@ALPHITON
 {\insignificantWhitespaces
   \int1 \int2 \int3
   \discard
@@ -772,7 +772,7 @@
 
 #|
 @BEGIN TEST STACK-OPS-2
-@MEX
+@ALPHITON
 ABCDE\exch\dup \int5\int-3\roll \int4\int2\roll 42\roll\exch
 \int12\int3\roll
 \int-2\int5\roll
@@ -782,7 +782,7 @@ ABCDE\exch\dup \int5\int-3\roll \int4\int2\roll 42\roll\exch
  {"t":"B\n"},
  @ERROR IN "\\roll" ("Stack underflow"),
  {"t":"\n"},
- @ERROR IN "\\roll" ("Data on stack are not valid arguments for this operation: -2 5")] 
+ @ERROR IN "\\roll" ("Data on stack are not valid arguments for this operation: -2 5")]
 @END TEST
 |#
 

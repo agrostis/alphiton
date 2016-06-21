@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Control features
 
@@ -228,7 +228,7 @@
               (lambda (input)
                 (let* ((input-tsrc (expansion-to-token-source
                                      input nil mctx))
-                       (body-tsrc (mex-expand (vector expander) nil
+                       (body-tsrc (alphiton-expand (vector expander) nil
                                     input-tsrc context nil)))
                   (funcall callback body-tsrc context)))))
           lctx ship))))
@@ -309,7 +309,7 @@
 
 #|
 @BEGIN TEST CONTROL1
-@MEX
+@ALPHITON
 \insignificantWhitespaces
 \def\multipleof#N{\int#N\rem\int0\eq}
 \for\x=\ints 2 \to 4

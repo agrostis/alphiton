@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Lisp / JS compatibility
 
@@ -105,7 +105,7 @@
             "~&~%; writing generated JavaScript to ~S...~%"
             (enough-namestring js-file))
     (let ((target-code (js-target-concat))
-          (exports (js-exports '#:mex)))
+          (exports (js-exports '#:alphiton)))
       (if (probe-file js-file)
           (linewise-template:process-template
               ((:file js-file :update t
@@ -500,13 +500,13 @@
   elts)
 
 (defun stack-p (thing)
-  "Return true if THING may be used as a stack, and NIL otherwise." 
+  "Return true if THING may be used as a stack, and NIL otherwise."
   (and (vectorp thing)
        (adjustable-array-p thing)
        (array-has-fill-pointer-p thing)))
 
 (defpsfun stack-p (thing)
-  "Return true if THING may be used as a stack, and false otherwise." 
+  "Return true if THING may be used as a stack, and false otherwise."
   (vectorp thing))
 
 (defun stack-depth (stack)
@@ -811,7 +811,8 @@
   `(lisp (make-struct-ps ,thing)))
 
 (defun external-p (symbol)
-  (eq (nth-value 1 (find-symbol (symbol-name symbol) '#:mex)) :external))
+  (eq (nth-value 1 (find-symbol (symbol-name symbol) '#:alphiton))
+      :external))
 
 (defpsmacro defstruct (name-and-options &rest slots)
   "Define macros and functions to create instances of the specified

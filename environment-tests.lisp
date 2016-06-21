@@ -1,6 +1,6 @@
-(in-package #:mex-test)
+(in-package #:alphiton-test)
 
-(in-suite mex-tests)
+(in-suite alphiton-tests)
 
 (defmacro rand-string-test (name &body body)
   `(test ,name
@@ -33,22 +33,22 @@
 (rand-string-test char-noise-robustness
   ;; Processing 10KB random data should cause no Lisp errors.
   (is-true (let ((noise (rand-string 10240)))
-             (trap-errors (:rand-string noise) (mex noise) t))))
+             (trap-errors (:rand-string noise) (alphiton noise) t))))
 
 (defun rand-category-table ()
-  (let ((base-cats (list mex::*ccat-invalid* mex::*ccat-whitespace*
-                         mex::*ccat-newline* mex::*ccat-escape*
-                         mex::*ccat-param* mex::*ccat-lbrace*
-                         mex::*ccat-rbrace* mex::*ccat-letter*
-                         mex::*ccat-number* mex::*ccat-other*))
-        (flag-cats (list mex::*ccat-active* mex::*ccat-constituent*)))
+  (let ((base-cats (list alphiton::*ccat-invalid* alphiton::*ccat-whitespace*
+                         alphiton::*ccat-newline* alphiton::*ccat-escape*
+                         alphiton::*ccat-param* alphiton::*ccat-lbrace*
+                         alphiton::*ccat-rbrace* alphiton::*ccat-letter*
+                         alphiton::*ccat-number* alphiton::*ccat-other*))
+        (flag-cats (list alphiton::*ccat-active* alphiton::*ccat-constituent*)))
     (loop for i :from -1 :below 256
           for rcat-base := (elt base-cats (random (length base-cats)))
           for rcat := (reduce
                         (lambda (flag cat) (logior (* flag (random 2)) cat))
                         flag-cats
                         :initial-value rcat-base)
-          for ctab := mex:*plain-category-table*
+          for ctab := alphiton:*plain-category-table*
             :then (char-cat i ctab rcat)
           finally (return ctab))))
 
@@ -57,22 +57,23 @@
   ;; random.
   (let ((rct (rand-category-table))
         (noise (rand-string 10240)))
-    (let ((*root-context* (mex::spawn-context (mex::init-root-context)
+    (let ((*root-context* (alphiton::spawn-context
+                            (alphiton::init-root-context)
                             :category-table rct)))
       (is-true (trap-errors (:rand-string noise :rand-ccat rct)
-                 (mex noise) t)))))
+                 (alphiton noise) t)))))
 
 (let ((standard-command-tokens nil))
   (defun rand-standard-command-token ()
     (when (null standard-command-tokens)
-      (mex::init-root-context)
+      (alphiton::init-root-context)
       (setf standard-command-tokens
               (concatenate 'vector
                 (loop for k :being each hash-key
-                        :of (mex::command-table *root-context*)
+                        :of (alphiton::command-table *root-context*)
                       collect k)
                 (loop for k :being each hash-key
-                        :of (gethash "" (mex::locale-table *root-context*))
+                        :of (gethash "" (alphiton::locale-table *root-context*))
                       unless (equal k "") collect k))))
     (aref standard-command-tokens
           (random (length standard-command-tokens)))))
@@ -85,12 +86,12 @@
                   (if (zerop (mod (random 1000) 4))
                       (rand-standard-command-token)
                       (string c))))))
-    (is-true (trap-errors (:rand-string soup) (mex soup) t))))
+    (is-true (trap-errors (:rand-string soup) (alphiton soup) t))))
 
 (test simple-builtin
   (is-true
     (let ((plist nil))
-      (mex "\\setp{foo}{one}\\setp{bar}{two}"
+      (alphiton "\\setp{foo}{one}\\setp{bar}{two}"
            (simple-builtins-table
              (setp (ind val)
                (setf (getf plist (intern (string-upcase ind) '#:keyword))

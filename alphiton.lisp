@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; The entry point
 
@@ -7,7 +7,7 @@
   (defvar *root-context* nil)
 
   (defvar *prologue* #.%prologue%
-    "Mex code to run at start of processing.")
+    "Alphiton code to run at start of processing.")
 
   (defun init-root-context ()
     (or *root-context*
@@ -21,10 +21,10 @@
                                 :char-source *prologue*
                                 :char-source-offset 0))
                         (*no-transparent-contexts* t))
-                    (get-group-contents tsrc ctx t nil) 
+                    (get-group-contents tsrc ctx t nil)
                     ctx)))))
 
-  (defun mex (source &optional builtins want-context)
+  (defun alphiton (source &optional builtins want-context)
     (init-root-context)
     (with-capacity-guards ()
       (let* ((ctx (if (context-p want-context)
@@ -38,7 +38,7 @@
                      :char-source source
                      :char-source-offset 0))
              #+nil (previous-shipped nil)
-             #+nil (previous-shipped-count 0) 
+             #+nil (previous-shipped-count 0)
              (ship (unless want-context
                      (lambda (output ctx)
 ;                      (format *trace-output*

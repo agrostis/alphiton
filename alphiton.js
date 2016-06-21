@@ -1,4 +1,4 @@
-﻿function makeMexInstance() {
+﻿function makeAlphitonInstance() {
 
 /**************** BEGIN CODE ****************/
 /**************** END CODE ****************/

@@ -1,4 +1,4 @@
-(in-package #:mex)
+(in-package #:alphiton)
 
 ;;; Commands
 
@@ -21,7 +21,7 @@
     handler)
 
   (defstruct (macro (:include command))
-    "A command defined in Mex source with a sequence-of-tokens EXPANSION."
+    "A command defined in Alphiton source with a sequence-of-tokens EXPANSION."
     expansion)
 
   (defstruct (pattern-delimiter (:conc-name delimiter-))
@@ -296,7 +296,7 @@
       else do (setq input-elt-ps (next-group token-source context))
         and if (parser-error input-elt-ps)
           return nil
-        else 
+        else
           do (setq input-elt (accumulator input-elt-ps))
       if (or (funcall *group-end-p* input-elt)
              (par-break-p input-elt)
@@ -404,7 +404,7 @@
                            :parent-source parent-source
                            :expansion-context context))))
 
-  (defun mex-expand (commands dispatching token-source context ship)
+  (defun alphiton-expand (commands dispatching token-source context ship)
     "Match COMMANDS (obtained by resolving the token DISPATCHING) against
      the input in TOKEN-SOURCE, as by MATCH-COMMAND-BEST, convert the
      expansion to a token source, and return it.  If a matching error
@@ -459,7 +459,7 @@
 
 #|
 @BEGIN TEST MACRO-DEF
-@MEX
+@ALPHITON
 \def\bar#1\baz{bar: <#1>}
 \def\foo\baz#X#Y#Z{foo.xyz: <#X> <#Y> <#Z>}
 \def\foo#Q\baz#Q\quux#Q{foo.qqq: <#Q>}
@@ -470,7 +470,7 @@
 
 @BEGIN TEST MACRO-MATCH-1
 @USE MACRO-DEF
-@MEX
+@ALPHITON
 \bar one\baz , \bar{another}\baz , \foo\baz two , \foo\baz{three}+{four}
 @JSON
 {"t": "bar: <one>, bar: <another>, foo.xyz: <t> <w> <o> , foo.xyz: <three> <+> <four>"}
@@ -478,7 +478,7 @@
 
 @BEGIN TEST MACRO-MATCH-2
 @USE MACRO-DEF
-@MEX
+@ALPHITON
 \mac5 , \foo{s}\baz{i}\quux{x} , \bar\baz , \foo7\baz\quux8
 @JSON
 {"t": "mac: <5> , foo.qqq: <six> , bar: <>, foo.qqq: <78>"}
@@ -486,7 +486,7 @@
 
 @BEGIN TEST MACRO-BEST-MATCH
 @USE MACRO-DEF
-@MEX
+@ALPHITON
 \foo\baz1234
 
 \def\foo\baz#P#Q#R#S{foo.pqrs: <#P> <#Q> <#R> <#S>}
@@ -500,7 +500,7 @@
 
 @BEGIN TEST MACRO-MISMATCH
 @USE MACRO-DEF
-@MEX
+@ALPHITON
 \bar blah
 \mac
 
@@ -516,7 +516,7 @@
 @END TEST
 
 @BEGIN TEST SCOPE-1
-@MEX
+@ALPHITON
 \def\wrapI#\LOC{#\LOC{wrapI}}
 \def\wrapII#\LOC{#\LOC{wrapII}}
 \def\here#\NAME{This is in #\NAME.}
@@ -527,7 +527,7 @@
 @END TEST
 
 @BEGIN TEST SCOPE-2
-@MEX
+@ALPHITON
 \def\wrapParam{#\loc{wrapParam}}
 \def\wrapCmd{\loc{wrapCmd}}
 \def\loc#\NAME{Top loc referenced in #\NAME.}
@@ -548,7 +548,7 @@
 
   #| TBD: Make unexpandables context-local (consider \def within \edef). |#
 
-  (defun mex-dispatch (input token-source context ship)
+  (defun alphiton-dispatch (input token-source context ship)
     "If INPUT is an expandable token (i. e., if it is a command, active
      character, or parameter token, and is not excluded per *UNEXPANDABLE*
      or *UNEXPANDABLE-PARAMS*), look up the token's command bindings in the
@@ -578,8 +578,8 @@
       (if (eq commands t)
           (make-parser-state
             :token-source-state token-source :parser-value nil)
-          (let ((expn-tsrc (mex-expand commands input token-source context
-                                       ship)))
+          (let ((expn-tsrc (alphiton-expand commands input token-source
+                                            context ship)))
             (make-parser-state
               :token-source-state expn-tsrc :parser-value t)))))
 
@@ -590,7 +590,7 @@
                     nil ectx))
            (*verify-group-balance* verify-balance))
       (get-group-tokens tsrc+ context)))
- 
+
   (defun simulate-command-with-input (name token-source context
                                       value-if-undefined)
     "Look up commands bound to NAME in CONTEXT, match them against input
@@ -601,7 +601,8 @@
       (if (and (not commands) (not (eq value-if-undefined t)))
           value-if-undefined
           (let* ((context* (spawn-context context (opaque-context)))
-                 (expn (mex-expand commands key token-source context* nil)))
+                 (expn (alphiton-expand commands key token-source
+                                        context* nil)))
             (setf (parent-source expn) nil)
             expn))))
 
@@ -638,7 +639,7 @@
                  return (prog1 (next-token/shift ,tsrc ,context)
                           (setf ,token-source ,tsrc))
                else
-                 do (setf ,pstate (mex-dispatch ,tok0 ,tsrc ,context nil))
+                 do (setf ,pstate (alphiton-dispatch ,tok0 ,tsrc ,context nil))
                     (setf ,tsrc (token-source-state ,pstate))
                if (not (parser-value ,pstate))
                  return (progn (setf ,token-source ,tsrc)
@@ -659,7 +660,7 @@
                  return (prog1 (next-token/shift ,tsrc ,context)
                           (setf ,token-source ,tsrc))
                else
-                 do (setf ,pstate (mex-dispatch ,grp0 ,tsrc ,context nil))
+                 do (setf ,pstate (alphiton-dispatch ,grp0 ,tsrc ,context nil))
                     (setf ,tsrc (token-source-state ,pstate))
                if (not (parser-value ,pstate))
                  return (progn (setf ,token-source ,tsrc)
@@ -669,7 +670,7 @@
 
 #|
 @BEGIN TEST NOEXPAND
-@MEX
+@ALPHITON
 \def\foo{Foo!} \noexpand\foo
 \def\expand{Expanded: <\noexpand\foo>} \expand
 @JSON
@@ -736,9 +737,9 @@
    functions (except :SHIP, which is only visible in the handler).
    The :CONTEXT argument is the processing context.  The :SHIP argument is
    either null or the shipper function, which may be passed to NEXT-GROUP,
-   MEX-DISPATCH, etc. The :MATCH argument is the COMMAND-MATCH object from
-   which the matcher and the handler get their input tokens; it should be
-   updated by the matcher to hold the right match length, matched token
+   ALPHITON-DISPATCH, etc. The :MATCH argument is the COMMAND-MATCH object
+   from which the matcher and the handler get their input tokens; it should
+   be updated by the matcher to hold the right match length, matched token
    count, and token source state.  That, and the token on which the builtin
    got dispatched, may also be bound to the :TOKEN-SOURCE and :DISPATCHING
    arguments.
@@ -763,7 +764,7 @@
       (let ((interface-vars (member-if #'keywordp vars)))
         (list* (ldiff vars interface-vars) interface-vars))
     (let* ((match-context-declarations `((declare
-                                          (ignorable 
+                                          (ignorable
                                            ,match-var ,context-var))))
            (ship-declarations `((declare (ignorable ,ship-var))))
            (disp-tsrc-bindings `(,@(when dispatching-var
@@ -1018,7 +1019,7 @@
 
 (defpsfun function-to-simple-builtin (fn)
   (let ((arity (length fn)))
-    (make-builtin 
+    (make-builtin
       :pattern (lambda (match ctx)
                  (loop repeat arity with g := nil with dml := 0
                        with tsrc := (token-source-state match)

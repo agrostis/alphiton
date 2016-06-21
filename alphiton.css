@@ -1,13 +1,13 @@
-span.mex_error_display {
+span.alphiton_error_display {
   color: red;
   font-weight: bold;
   cursor: help;
 }
 
-span.mex_error_display span.mex_eot:before {
+span.alphiton_error_display span.alphiton_eot:before {
   content: "EOT";
 }
-span.mex_error_display span.mex_eot {
+span.alphiton_error_display span.alphiton_eot {
   background-color: red;
   color: white;
   font-size: small;
@@ -15,7 +15,7 @@ span.mex_error_display span.mex_eot {
   padding: 1px 3px;
 }
 
-span.mex_error_display span.mex_error_messages {
+span.alphiton_error_display span.alphiton_error_messages {
   z-index: 10;
   display: none;
   padding: 8px 10px;
@@ -25,10 +25,10 @@ span.mex_error_display span.mex_error_messages {
   font-size: x-small;
   font-weight: normal;
 }
-span.mex_error_display:hover {
+span.alphiton_error_display:hover {
   border-bottom: 1px dotted #D88;
 }
-span.mex_error_display:hover span.mex_error_messages {
+span.alphiton_error_display:hover span.alphiton_error_messages {
   display: inline;
   position: absolute;
   color: #555;

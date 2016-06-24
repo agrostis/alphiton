@@ -86,7 +86,7 @@
               if (spec.use.length > 0) {
                   ctx = true;
                   for (var i = 0; i < spec.use.length; ++i) {
-                      ctx = ALPHITON.alphiton(ALPHITON_TESTS[spec.use[i]].alphiton, ctx);
+                      ctx = ALPHITON.alphiton(ALPHITON_TESTS[spec.use[i]].alphiton, null, ctx);
                   }
                   ALPHITON.ROOT_CONTEXT = ctx;
               }
